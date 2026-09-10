@@ -1,4 +1,4 @@
-import { ORDERS, COMPLETED, ORGANIZATIONS, ORG_COUNT } from './src/data/orders.ts';
+import { ORDERS, COMPLETED, ORGANIZATIONS, ORG_COUNT } from '../src/data/orders.ts';
 const by = (rows, f) => rows.reduce((m,r)=>{const k=f(r); if(k===undefined)return m; m[k]=(m[k]||0)+1; return m;},{});
 console.log('rows', ORDERS.length, '| completed', COMPLETED.length, '| orgs', ORG_COUNT, '| org defs', ORGANIZATIONS.length);
 const months = {};
