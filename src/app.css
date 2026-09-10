@@ -1,0 +1,106 @@
+/* App-level only. Anything that could belong to a component belongs in the
+   library instead — see rule 1 in CLAUDE.md.
+
+   This file used to bind --rw-font-display/-sans and .rw-numeric's face,
+   because the contract had nowhere to put a figure face. It does now
+   (BrandFonts.numeric), so all three come from themes/reporter.css and the app
+   patches nothing. */
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
+
+/* ============================================================================
+   Layout classes, because THIS APP HAS NO TAILWIND BUILD.
+
+   ⚠️ Worth stating plainly, because it is invisible and it is the reason this
+   block exists: there is no `tailwindcss` dependency, no plugin and no
+   `@import "tailwindcss"` here. Every utility class in this app works only
+   because `@realwired/ui`'s COMPILED stylesheet already emitted that exact
+   class for its own components.
+
+   So the app can use `flex`, `gap-4`, `rounded-lg`, `bg-selected`, `mt-auto`
+   and `size-9` — the library uses them — and it CANNOT use:
+
+     · `grid-cols-*`          no rule is emitted; `display:grid` alone applies
+     · any responsive prefix  `sm:` `lg:` `xl:` `2xl:` never match
+     · any arbitrary value    `min-w-[240px]`, `min-h-[168px]` compute to 0
+     · `min-h-9`              never emitted
+
+   MEASURED with `getComputedStyle` on a mounted probe element, which is the
+   only test that cannot be fooled by how the CSS was emitted — grepping the
+   stylesheet for `.lg\:grid-cols-3` reports every class as missing, including
+   ones plainly working on screen. That is TRAPS §0's bad test.
+
+   This is also the real cause of the `xl:pe-[436px]` mystery in TRAPS §1: the
+   utility was not "silently not generated", it was never generatable here.
+
+   Hence real classes, per TRAPS §1's own advice — a class in `app.css` with
+   the reason beside it beats an arbitrary utility for a one-off layout value.
+   Values come from tokens; the breakpoints match Tailwind's so the app and the
+   library agree about where a layout changes.
+   ========================================================================== */
+
+/* The report library's card grid. Steps 1 → 2 → 3 → 4 up; never one wide
+   column, where a card is a header with a horizon of whitespace beside it. */
+.rw-card-grid {
+  display: grid;
+  gap: var(--rw-gap, 16px);
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 640px) {
+  .rw-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1024px) {
+  .rw-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1536px) {
+  .rw-card-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* The builder's three columns: fields · preview · shelf.
+
+   Stacked below 1280px rather than squeezed. Three columns in 1100px gives the
+   preview ~520px, which is narrower than the tile it is previewing — a preview
+   that misrepresents the size it is claiming to show is worse than one that
+   sits below the panels. */
+.rw-builder {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.rw-builder-fields,
+.rw-builder-shelf {
+  flex: none;
+}
+@media (min-width: 1280px) {
+  .rw-builder {
+    flex-direction: row;
+  }
+  .rw-builder-fields {
+    width: 262px;
+    border-inline-end: 1px solid var(--rw-border-subtle);
+  }
+  .rw-builder-shelf {
+    width: 318px;
+    border-inline-start: 1px solid var(--rw-border-subtle);
+  }
+}
+
+/* A drop target's floor, so an empty slot is a target rather than a hairline. */
+.rw-slot-min {
+  min-height: 36px;
+}

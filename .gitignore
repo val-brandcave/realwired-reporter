@@ -1,0 +1,29 @@
+node_modules
+dist
+.vite
+*.local
+
+# The packed library tarball IS committed, and it has to be.
+#
+# `package.json` depends on `@realwired/ui` as `file:vendor/realwired-ui-0.1.0.tgz`.
+# Vercel runs `npm install` against a clean checkout, so if the tarball is not in
+# the repo the install fails and there is no build — the dependency simply is not
+# resolvable. 654 KB of binary in git is the price of the prototype deploying at
+# all, and `npm run relink` will overwrite it in place each time the library moves.
+#
+# The alternative is publishing @realwired/ui to a registry and giving Vercel a
+# token. Worth doing when the library has consumers outside this desktop; not
+# before the 16th.
+
+# Internal working documents — kept on disk, deliberately not in this repo.
+#
+# The published repo is public, and these are our own planning and engagement
+# notes rather than part of the application. They stay in the working copy, so
+# an agent working here still reads CLAUDE.md for its context.
+CLAUDE.md
+docs/PLAN.md
+docs/TRAPS.md
+docs/canvas/
+
+# TypeScript's incremental build cache. Machine-local.
+tsconfig.tsbuildinfo
