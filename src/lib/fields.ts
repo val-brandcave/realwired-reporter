@@ -351,6 +351,33 @@ export const MEASURES: MeasureField[] = [
     aggs: ['count'],
   },
   {
+    key: 'classified',
+    /*
+     * ⭐ A fact about a row, not a statistic about the book — which is what
+     * makes it an atom rather than something Insights computes for itself.
+     *
+     * Each order is either classified or it is not; averaged over a scope, that
+     * IS the coverage percentage. So "how much of my book can I trust" becomes
+     * an ordinary binding — a dial, a trend, a bar by organization — instead of
+     * a number one screen knows how to calculate. That matters beyond Insights:
+     * the whole premise is that nothing renders except from a spec, and a
+     * coverage figure hard-coded into a page would be the first exception.
+     *
+     * 0 is a MEASUREMENT here, not a gap, which is why `get` never returns
+     * undefined: an order with no category has definitely not been classified.
+     * Compare `clientFee`, where an absent value means nobody recorded one.
+     */
+    label: 'Classified',
+    blurb:
+      'Whether the order has a request category. Averaged over a scope it is the share that do.',
+    unit: 'pct',
+    defaultAgg: 'avg',
+    /* Only `avg`. Summing it counts orders in units of percent, and a builder
+       that offers an aggregation will have it chosen. */
+    aggs: ['avg'],
+    get: (r) => (r.requestCategory ? 100 : 0),
+  },
+  {
     key: 'clientFee',
     label: 'Client fee',
     blurb: 'What the organization is billed. Includes pass-through costs.',

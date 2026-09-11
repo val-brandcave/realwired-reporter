@@ -100,6 +100,30 @@ body {
   }
 }
 
+/* Insights' watch row — three counts across.
+
+   ⚠️ There is no matching two-up class for the findings above it, and there
+   was: MEASURED, a finding card in a two-up row is 436px wide, which wraps
+   every category label in the SLA chart and left its plot needing 494px inside
+   a 400px box — three of six categories were simply not drawn. Findings are one
+   column so their evidence is legible; see the note in `InsightsPage`.
+
+   These three hold counts and a sentence, no chart, so they are fine side by
+   side. They stack below 900px rather than squeezing. The breakpoint is 900
+   rather than one of Tailwind's because the constraint is the CARD's width, not
+   the viewport's — the page's reading column is capped at 980, so a viewport
+   wider than that does not make these cards wider. */
+.rw-insight-trio {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 900px) {
+  .rw-insight-trio {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* A drop target's floor, so an empty slot is a target rather than a hairline. */
 .rw-slot-min {
   min-height: 36px;

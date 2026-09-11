@@ -12,6 +12,7 @@ import {
 import { BuilderPage } from './pages/BuilderPage';
 import { ChatPage } from './pages/ChatPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { InsightsPage } from './pages/InsightsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { EMPTY_FILTERS, type Filters } from './lib/context';
 import { NAV } from './nav';
@@ -136,12 +137,7 @@ export function App() {
 
           <Route
             path="/insights"
-            element={
-              <Coming
-                title="Insights"
-                note="What changed, what you can trust, and what to look at — with the coverage figure first, because confidence in the data is the thing standing in front of everything else."
-              />
-            }
+            element={<InsightsPage filters={filters} onFiltersChange={setFilters} />}
           />
           <Route
             path="/dashboards/:id"

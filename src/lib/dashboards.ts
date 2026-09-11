@@ -95,9 +95,32 @@ export const DASHBOARDS: Dashboard[] = [
       { id: 'r-system-fee', x: 9, y: 0, w: 3, h: 2 },
       { id: 'r-order-activity', x: 0, y: 2, w: 8, h: 3 },
       { id: 'r-category-mix', x: 8, y: 2, w: 4, h: 3 },
-      { id: 'r-turnaround-sla', x: 0, y: 5, w: 6, h: 3 },
-      { id: 'r-status-mix', x: 6, y: 5, w: 6, h: 3 },
-      { id: 'r-org-breakdown', x: 0, y: 8, w: 12, h: 4 },
+      /*
+       * ⚠️ FOUR rows, not three, and it was three until 2026-09-11.
+       *
+       * MEASURED on this board: at h:3 the target chart's plot box was 122px
+       * holding 214px — `Review` and `Inspection` were **not drawn at all**,
+       * silently, on the board the demo opens with. Six categories were in the
+       * DOM and four were on screen. Nothing errored and the chart looked
+       * finished, which is this project's whole failure mode.
+       *
+       * `target`'s catalogue default is [6,4]; this tile was shipped below it.
+       * A placement narrower or shorter than a shape's own default is a
+       * promise the shape did not make — check `widgetSize(type).def` before
+       * writing one by hand.
+       *
+       * FIVE rather than the catalogue's four, and the extra row is measured
+       * too: at 6 columns the tile is 609px wide, which wraps "Commercial
+       * appraisal" and "Residential appraisal" onto two lines, and seven rows
+       * of that (six categories plus Unassigned) ran 6px past the box — enough
+       * to slice the `0d`/`32d` axis labels in half. A target chart's height
+       * scales with its category COUNT and with whether its labels wrap, which
+       * a single default pair cannot express; when a shape's rows are
+       * data-driven, measure the tile rather than trusting `def`.
+       */
+      { id: 'r-turnaround-sla', x: 0, y: 5, w: 6, h: 5 },
+      { id: 'r-status-mix', x: 6, y: 5, w: 6, h: 5 },
+      { id: 'r-org-breakdown', x: 0, y: 10, w: 12, h: 4 },
     ],
   },
   {

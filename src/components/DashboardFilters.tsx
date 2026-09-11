@@ -73,6 +73,16 @@ export interface DashboardFiltersOptions {
   fields: readonly string[];
   /** The board's shipped defaults, for `Reset`. */
   shipped: Record<string, string[]>;
+  /**
+   * The modal's heading and its line of explanation.
+   *
+   * Defaulted rather than required because every dashboard says the same thing;
+   * they are options because Insights is not a dashboard, and a modal titled
+   * "Filter this dashboard" on a screen that is not one is the kind of small
+   * lie a reader notices and then stops trusting the rest of.
+   */
+  title?: string;
+  description?: string;
 }
 
 export interface DashboardFiltersParts {
@@ -89,6 +99,8 @@ export function useDashboardFilters({
   onChange,
   fields,
   shipped,
+  title = 'Filter this dashboard',
+  description = 'Filters stay with you on any dashboard that offers the same field.',
 }: DashboardFiltersOptions): DashboardFiltersParts {
   const [open, setOpen] = useState(false);
 
@@ -182,8 +194,8 @@ export function useDashboardFilters({
       <FilterDialog<Filters>
         open={open}
         onOpenChange={setOpen}
-        title="Filter this dashboard"
-        description="Filters stay with you on any dashboard that offers the same field."
+        title={title}
+        description={description}
         value={filters}
         emptyValue={resetTo}
         onApply={onChange}

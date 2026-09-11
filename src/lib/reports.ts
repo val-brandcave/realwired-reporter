@@ -175,6 +175,28 @@ export const REPORTS: Report[] = [
     tags: ['revenue', 'clients'],
   },
   {
+    /*
+     * ⭐ The trust figure, as an ordinary report.
+     *
+     * Insights leads with coverage, and this is what it leads with — a `dial`
+     * over the `classified` atom, resolved by the same engine as every other
+     * widget. It is a starter rather than something the Insights page draws for
+     * itself so that it can be pinned to a board, opened in the builder, and
+     * asked about in the copilot like anything else: the figure a reader is
+     * being asked to trust should not be the one figure the product computes
+     * off to one side.
+     */
+    id: 'r-classification-coverage',
+    title: 'Classification coverage',
+    hint: 'The share of orders in the period that have a request category. The rest are shown as Unassigned in every breakdown rather than dropped, so no fee goes silently missing.',
+    type: 'dial',
+    binding: b({ y: [{ key: 'classified', agg: 'avg' }] }),
+    options: { caption: 'of orders carry a request category' },
+    noun: 'completed orders',
+    origin: 'starter',
+    tags: ['data quality', 'kpi'],
+  },
+  {
     id: 'r-turnaround-sla',
     title: 'Turnaround against SLA',
     hint: "Average calendar days to complete, by request category, against that category's SLA target. Identifies where actual turnaround exceeds the target.",
