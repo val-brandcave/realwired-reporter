@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { AppShell, PageBody, PageHeader, UserMenu, type ThemePref } from '@realwired/ui';
+import {
+  AppShell,
+  PageBody,
+  PageHeader,
+  ToastProvider,
+  UserMenu,
+  type ThemePref,
+} from '@realwired/ui';
 
 import { BuilderPage } from './pages/BuilderPage';
+import { ChatPage } from './pages/ChatPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { EMPTY_FILTERS, type Filters } from './lib/context';
@@ -83,85 +91,83 @@ export function App() {
   }, [theme]);
 
   return (
-    <AppShell
-      nav={NAV}
-      currentPath={pathname}
-      linkComponent={RouterLink}
-      brand={(collapsed) => <Brandmark collapsed={collapsed} />}
-      header={{
-        texture: false,
-        /*
-         * The trailing edge is where `AppHeader` documents the user menu
-         * belongs, and the approved `Reports` artboard draws an avatar there.
-         * The library already had the component; the app simply never passed
-         * one, which is why the header looked unfinished.
-         *
-         * The demo runs as the product's primary user — the whole
-         * prototype is arranged around her questions. The organizations in the
-         * data are fictional; the operator is not, and pretending otherwise
-         * would make the chrome read as a stranger's account.
-         */
-        end: (
-          <UserMenu
-            name="Brenda Wilson"
-            email="brenda@realwired.com"
-            theme={theme}
-            onThemeChange={setTheme}
-            items={[
-              { id: 'profile', label: 'Your profile', icon: 'user' },
-              { id: 'settings', label: 'Settings', icon: 'settings' },
-              { id: 'signout', label: 'Sign out', icon: 'logout', danger: true },
-            ]}
+    /* One provider for the whole app. The copilot's three offers each do
+       something invisible — a report written to the library, a tile placed on
+       a board you are not looking at — and an action with no acknowledgement
+       reads as a dead button. */
+    <ToastProvider>
+      <AppShell
+        nav={NAV}
+        currentPath={pathname}
+        linkComponent={RouterLink}
+        brand={(collapsed) => <Brandmark collapsed={collapsed} />}
+        header={{
+          texture: false,
+          /*
+           * The trailing edge is where `AppHeader` documents the user menu
+           * belongs, and the approved `Reports` artboard draws an avatar there.
+           * The library already had the component; the app simply never passed
+           * one, which is why the header looked unfinished.
+           *
+           * The demo runs as the product's primary user — the whole
+           * prototype is arranged around her questions. The organizations in the
+           * data are fictional; the operator is not, and pretending otherwise
+           * would make the chrome read as a stranger's account.
+           */
+          end: (
+            <UserMenu
+              name="Brenda Wilson"
+              email="brenda@realwired.com"
+              theme={theme}
+              onThemeChange={setTheme}
+              items={[
+                { id: 'profile', label: 'Your profile', icon: 'user' },
+                { id: 'settings', label: 'Settings', icon: 'settings' },
+                { id: 'signout', label: 'Sign out', icon: 'logout', danger: true },
+              ]}
+            />
+          ),
+        }}
+      >
+        {/* <DemoBanner /> — off for now, Val 10 Sept. See the note by the import. */}
+        <Routes>
+          <Route path="/" element={<Navigate to="/dashboards/overview" replace />} />
+          <Route path="/dashboards" element={<Navigate to="/dashboards/overview" replace />} />
+
+          <Route
+            path="/insights"
+            element={
+              <Coming
+                title="Insights"
+                note="What changed, what you can trust, and what to look at — with the coverage figure first, because confidence in the data is the thing standing in front of everything else."
+              />
+            }
           />
-        ),
-      }}
-    >
-      {/* <DemoBanner /> — off for now, Val 10 Sept. See the note by the import. */}
-      <Routes>
-        <Route path="/" element={<Navigate to="/dashboards/overview" replace />} />
-        <Route path="/dashboards" element={<Navigate to="/dashboards/overview" replace />} />
+          <Route
+            path="/dashboards/:id"
+            element={<DashboardPage filters={filters} onFiltersChange={setFilters} />}
+          />
+          <Route path="/reports" element={<ReportsPage />} />
+          {/*
+            `new` before `:id`, and the order is load-bearing: react-router would
+            otherwise match "/reports/new" as a report whose id is "new" and the
+            builder would open looking for a report that does not exist.
+          */}
+          <Route path="/reports/new" element={<BuilderPage filters={filters} />} />
+          <Route path="/reports/:id" element={<BuilderPage filters={filters} />} />
+          <Route path="/chat" element={<ChatPage />} />
 
-        <Route
-          path="/insights"
-          element={
-            <Coming
-              title="Insights"
-              note="What changed, what you can trust, and what to look at — with the coverage figure first, because confidence in the data is the thing standing in front of everything else."
-            />
-          }
-        />
-        <Route
-          path="/dashboards/:id"
-          element={<DashboardPage filters={filters} onFiltersChange={setFilters} />}
-        />
-        <Route path="/reports" element={<ReportsPage />} />
-        {/*
-          `new` before `:id`, and the order is load-bearing: react-router would
-          otherwise match "/reports/new" as a report whose id is "new" and the
-          builder would open looking for a report that does not exist.
-        */}
-        <Route path="/reports/new" element={<BuilderPage filters={filters} />} />
-        <Route path="/reports/:id" element={<BuilderPage filters={filters} />} />
-        <Route
-          path="/chat"
-          element={
-            <Coming
-              title="Chat"
-              note="Ask about your orders, fees or turnaround. The answer is a widget you can edit, save, or drop onto a dashboard."
-            />
-          }
-        />
-
-        <Route
-          path="*"
-          element={
-            <Coming
-              title="Not found"
-              note="That page does not exist. Pick a dashboard from the rail to get back."
-            />
-          }
-        />
-      </Routes>
-    </AppShell>
+          <Route
+            path="*"
+            element={
+              <Coming
+                title="Not found"
+                note="That page does not exist. Pick a dashboard from the rail to get back."
+              />
+            }
+          />
+        </Routes>
+      </AppShell>
+    </ToastProvider>
   );
 }
