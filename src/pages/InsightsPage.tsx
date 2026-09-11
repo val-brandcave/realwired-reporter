@@ -4,6 +4,7 @@ import type { WidgetTypeId } from '@realwired/ui';
 import {
   Button,
   Callout,
+  DialViz,
   InsightBand,
   InsightCard,
   PageBody,
@@ -16,7 +17,7 @@ import {
 import { useDashboardFilters } from '../components/DashboardFilters';
 import { ReportWidget } from '../components/ReportWidget';
 import { ORDERS } from '../data/orders';
-import { bindingDateBasis } from '../lib/binding';
+import { bindingDateBasis, resolveBinding } from '../lib/binding';
 import { addToDashboard } from '../lib/boards';
 import { applyPeriod, applyValues, type Filters } from '../lib/context';
 import { findDimension, type OrderRow } from '../lib/fields';
@@ -162,6 +163,72 @@ export function InsightsPage({ filters, onFiltersChange }: InsightsPageProps) {
      rather than restating the answer in a second voice. */
   const ask = useCallback(() => navigate('/chat'), [navigate]);
 
+  /**
+   * Band 1's card — the figure BESIDE the sentence, not under it.
+   *
+   * ⭐ The artboard draws this differently from every other card on the screen
+   * and the difference is the point: `Insights.dc.html` band 1 is
+   * `flex-direction:row` with a 132px column holding a bare 132×82 arc and its
+   * caption, and the paragraph filling the rest. There is no widget frame —
+   * no title bar, no DEMO chip, no coverage footer.
+   *
+   * Rendered as an ordinary `attachment` it came out as a 934×400 framed
+   * widget under the prose: a dial four hundred pixels tall whose own title
+   * repeated the sentence above it, which is most of what made this screen
+   * read as one item per row. MEASURED before the change — the three evidence
+   * tiles were 934×400, 934×400 and 934×296.
+   *
+   * So this one card uses `DialViz` directly rather than `ReportWidget`. It is
+   * still the registry's shape fed by the registry's resolver — the same
+   * `r-classification-coverage` binding, resolved the same way — just without
+   * the frame, which is the part the artboard omits. Nothing here draws a
+   * chart the catalogue does not own.
+   */
+  const renderTrust = (finding: Finding) => {
+    const report = finding.report;
+    const range = finding.range ?? filters.range;
+    const scoped = report
+      ? narrow(applyPeriod(ORDERS, range, finding.basis ?? bindingDateBasis(report.binding)))
+      : [];
+    const dataset = report ? resolveBinding(report.binding, scoped, range).dataset : undefined;
+
+    return (
+      <InsightCard
+        key={finding.id}
+        tone={finding.tone}
+        icon={finding.icon}
+        title={finding.title}
+        figure={
+          dataset ? (
+            /* 82px, the artboard's arc height. `fill` is deliberately OFF:
+               outside a frame there is no definite-height parent for `h-full`
+               to resolve against, and the shape would collapse to nothing. */
+            <DialViz
+              dataset={dataset}
+              options={{ caption: 'of orders classified', height: 82 }}
+            />
+          ) : undefined
+        }
+        actions={
+          <>
+            {report && (
+              <Button variant="outline" size="sm" iconLeft="add" onClick={() => pin(finding)}>
+                Pin to Overview
+              </Button>
+            )}
+            {finding.ask && (
+              <Button variant="ghost" size="sm" iconLeft="comment" onClick={ask}>
+                Ask about this
+              </Button>
+            )}
+          </>
+        }
+      >
+        {finding.prose}
+      </InsightCard>
+    );
+  };
+
   /** One finding, with its evidence and its offers. */
   const render = (finding: Finding) => {
     const report = finding.report;
@@ -240,7 +307,10 @@ export function InsightsPage({ filters, onFiltersChange }: InsightsPageProps) {
       <PageHeader title="Insights" actions={filterParts.button} toolbar={filterParts.summary} />
 
       <PageBody>
-        <div className="mx-auto flex w-full flex-col gap-6" style={{ maxWidth: COLUMN }}>
+        <div
+          className="rw-insight-column mx-auto flex w-full flex-col gap-6"
+          style={{ maxWidth: COLUMN }}
+        >
           <div>
             <h1 className="font-display text-2xl font-bold tracking-[-0.02em] text-ink">
               {greeting()}, Brenda
@@ -275,7 +345,7 @@ export function InsightsPage({ filters, onFiltersChange }: InsightsPageProps) {
           )}
 
           {/* ⭐ BAND 1 FIRST, deliberately. Trust before interpretation. */}
-          <InsightBand label="What you can trust">{render(read.coverage)}</InsightBand>
+          <InsightBand label="What you can trust">{renderTrust(read.coverage)}</InsightBand>
 
           {/*
             An empty band is NOT rendered — no heading over a blank space. A
@@ -285,24 +355,27 @@ export function InsightsPage({ filters, onFiltersChange }: InsightsPageProps) {
           {read.changed.length > 0 && (
             <InsightBand label={`What changed in ${filters.range.label.toLowerCase()}`}>
               {/*
-                ⚠️ ONE COLUMN, and this is a deliberate departure from the
-                approved artboard, which draws these two side by side.
+                ⭐ TWO-UP, as the artboard draws it — restored 11 Sept, and the
+                departure it replaces is worth keeping a record of because the
+                reasoning was sound and the conclusion was still wrong.
 
-                The artboard's cards carry hand-drawn sketches; ours carry the
-                real widget, and MEASURED at two-up the real widget does not
-                fit. A card in a two-up row is 436px wide, which wraps every
-                category label in the SLA chart onto two lines — so its plot
-                needed 494px inside a 400px box and drew THREE of six
-                categories, silently, on the screen whose subject is whether
-                the numbers can be trusted. At full width the labels sit on one
-                line, the plot needs 214px, and all six are drawn.
+                This was one column from the day it shipped, on a measurement:
+                at two-up a card was 436px, which wrapped every category label
+                in the SLA chart onto two lines, so its plot needed 494px in a
+                400px box and drew THREE of six categories. All true. What it
+                missed is that 436 was not a fact about two-up — it was a fact
+                about a two-up row inside a 980px reading column. The cap was
+                the cause, and the one-column band was a workaround for it.
 
-                Per CLAUDE.md's artboard rule: where the artboard and a legible
-                result cannot both be had, the choice gets written down. This is
-                that. The two-up arrangement survives in band 3, where the cards
-                hold counts rather than charts.
+                At COLUMN 1240 the same card is 612px, the labels sit on one
+                line, and all six categories draw. So the fix was to widen the
+                page rather than to stack the band.
+
+                `InsightCard` was built for this arrangement — `h-full` and the
+                `mt-auto` footer rule exist so two findings in a row end level,
+                and neither does anything in a single column.
               */}
-              <div className="flex flex-col gap-4">{read.changed.map(render)}</div>
+              <div className="rw-insight-pair">{read.changed.map(render)}</div>
             </InsightBand>
           )}
 
@@ -371,12 +444,25 @@ export function InsightsPage({ filters, onFiltersChange }: InsightsPageProps) {
 /**
  * The reading measure.
  *
- * Wider than the copilot's 820 because a finding's evidence is a chart sitting
- * in a two-up row, and a bar chart at 400px is a legend with a hint of a plot.
- * Narrower than the page, because the sentences are the content and prose set
- * to a 1920px monitor is unreadable.
+ * ⭐ 1240, raised from 980 on 11 Sept, and the old number was the cause of the
+ * screen's worst layout defect rather than a taste call.
+ *
+ * MEASURED from `Insights.dc.html`: canvas 1440, rail 236, page padding 32 a
+ * side — so the artboard's bands are 1140px wide and the page is not centred
+ * in a column at all. At 980 a two-up card was 436px, which is what forced
+ * band 2 into one column; every band then read as one item per row down the
+ * middle of a 1696px content area, with 716px of it unused.
+ *
+ * Still capped, because the cap is doing a second job the artboard never had
+ * to think about: it was drawn at 1440 and we render on whatever monitor is in
+ * the room. Band 1's paragraph runs the full width of its column, and prose
+ * set to 1696px is unreadable regardless of how much room there is.
+ *
+ * At 1240 a two-up card is 612px, which is the width at which the SLA target
+ * chart stops wrapping its category labels — the measurement that forced the
+ * one-column departure in the first place. See the note in band 2.
  */
-const COLUMN = 980;
+const COLUMN = 1240;
 
 /**
  * The evidence widget's height — the one a BOARD would give it.

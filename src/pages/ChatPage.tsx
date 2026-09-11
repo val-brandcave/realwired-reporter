@@ -366,7 +366,6 @@ export function ChatPage() {
               onSubmit={() => ask(draft)}
               busy={Boolean(pending)}
               placeholder="Ask about your orders, fees or turnaround"
-              footnote="Answers are scripted for this walkthrough. The widgets are real — every figure says what it counted and what it left out."
             />
           </div>
         </div>

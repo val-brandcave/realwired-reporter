@@ -102,17 +102,15 @@ body {
 
 /* Insights' watch row — three counts across.
 
-   ⚠️ There is no matching two-up class for the findings above it, and there
-   was: MEASURED, a finding card in a two-up row is 436px wide, which wraps
-   every category label in the SLA chart and left its plot needing 494px inside
-   a 400px box — three of six categories were simply not drawn. Findings are one
-   column so their evidence is legible; see the note in `InsightsPage`.
-
    These three hold counts and a sentence, no chart, so they are fine side by
    side. They stack below 900px rather than squeezing. The breakpoint is 900
    rather than one of Tailwind's because the constraint is the CARD's width, not
-   the viewport's — the page's reading column is capped at 980, so a viewport
-   wider than that does not make these cards wider. */
+   the viewport's — the page's reading column is capped, so a viewport wider
+   than the cap does not make these cards wider.
+
+   The findings band above has the harder constraint, because its cards hold
+   real widgets rather than counts. It states its floor in the units that
+   actually bind — see `.rw-insight-pair`. */
 .rw-insight-trio {
   display: grid;
   gap: 16px;
@@ -121,6 +119,45 @@ body {
 @media (min-width: 900px) {
   .rw-insight-trio {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Band 2's pair, as `Insights.dc.html` draws it:
+   `grid-template-columns:repeat(2,minmax(0,1fr));gap:16px`.
+
+   The floor is MEASURED rather than a round number. These cards hold real
+   widgets, and the widest shape any of them resolves to is the SLA target
+   chart, whose category labels wrap onto two lines below about 560px of card —
+   at which point its plot asks for 494px inside a 400px box and silently draws
+   three of its six categories. 1240 of column gives a card of 612; two cards at
+   the 560 floor plus the gap need 1136, so below 1140 the band stacks and each
+   card takes the full width instead. Squeezing is the one thing that must not
+   happen here: a clipped chart on the screen whose subject is whether the
+   numbers can be trusted.
+
+   ⚠️ A CONTAINER query, not a media query, and that is load-bearing rather
+   than stylistic. What decides whether two cards fit is the width of the
+   COLUMN — `min(1240, viewport − rail − padding)` — so the same viewport gives
+   a different answer with the rail collapsed than with it open, and a media
+   query would be wrong in one of those two states.
+
+   ⚠️ And the container is the COLUMN, not the band. An element cannot answer a
+   container query about itself: `container-type` on `.rw-insight-pair` makes it
+   a container for its CHILDREN and leaves its own `grid-template-columns`
+   querying whatever is above it — which is `normal`, so the query never matches
+   and the band silently stays one column. That was the first attempt here, and
+   it looked identical to the CSS not having been written. */
+.rw-insight-column {
+  container-type: inline-size;
+}
+.rw-insight-pair {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@container (min-width: 1140px) {
+  .rw-insight-pair {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

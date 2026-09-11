@@ -73,6 +73,27 @@ export function App() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
 
   /*
+   * The builder is a FULL-BLEED TAKEOVER, not a page inside the chrome.
+   *
+   * `Builder.dc.html` draws it at 1440×900 with no rail and no app header —
+   * its own 60px band carries the back chevron, the title field, the draft
+   * pill and the two save actions. `Main.dc.html` and `Reports.dc.html` both
+   * draw the rail, so the omission is a decision on the artboard, not an
+   * oversight. BrickLayer shipped the same split: `(builder)` is a route group
+   * whose layout deliberately escapes the shell, because "the report builder
+   * needs the width, and none of that chrome helps while binding fields".
+   *
+   * Rendered inside the shell it stacked two headers and paid 262px of rail
+   * for a three-column workbench that already yields to one column at 1280.
+   *
+   * `chromeless` is the shell's own mechanism for this — it keeps the flex
+   * and scroll structure identical and drops only the rail, the header and
+   * the flanks. So this is a prop, not a second layout tree, and the back
+   * chevron in the builder's header is now the only way out by design.
+   */
+  const chromeless = pathname.startsWith('/reports/');
+
+  /*
    * The theme, driven from the user menu.
    *
    * It lives here rather than in the menu because the attribute it sets is on
@@ -100,6 +121,7 @@ export function App() {
       <AppShell
         nav={NAV}
         currentPath={pathname}
+        chromeless={chromeless}
         linkComponent={RouterLink}
         brand={(collapsed) => <Brandmark collapsed={collapsed} />}
         header={{
