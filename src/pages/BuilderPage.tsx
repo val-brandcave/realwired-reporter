@@ -28,7 +28,7 @@ import {
   validate,
   type ReportBinding,
 } from '../lib/binding';
-import { addToDashboard, boardOptions } from '../lib/boards';
+import { addToDashboard, useBoardOptions } from '../lib/boards';
 import { applyPeriod, type Filters } from '../lib/context';
 import {
   AGG_FULL,
@@ -111,6 +111,9 @@ export function BuilderPage({ filters }: BuilderPageProps) {
 function Builder({ filters }: BuilderPageProps) {
   const { id } = useParams();
   const navigate = useNavigate();
+
+  /* Includes boards made in this session — see `useBoardOptions`. */
+  const boards = useBoardOptions();
 
   const existing = id ? lookupReport(id) : undefined;
 
@@ -329,7 +332,7 @@ function Builder({ filters }: BuilderPageProps) {
           */}
           <ActionMenu
             label="Add to dashboard"
-            items={boardOptions().map((b) => ({
+            items={boards.map((b) => ({
               id: b.id,
               label: b.name,
               onSelect: () => {

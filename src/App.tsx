@@ -15,7 +15,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { InsightsPage } from './pages/InsightsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { EMPTY_FILTERS, type Filters } from './lib/context';
-import { NAV } from './nav';
+import { useDashboards } from './lib/dashboards';
+import { buildNav } from './nav';
 import { Brandmark } from './components/Brandmark';
 // Val's call, 10 Sept: the demo-data banner is OFF for now. The component is
 // still there and this is a two-line restore — uncomment the import and the
@@ -106,6 +107,14 @@ export function App() {
    */
   const [theme, setTheme] = useState<ThemePref>('light');
 
+  /*
+   * The rail is DERIVED from the dashboards, so a board made on a call appears
+   * in it. See `nav.ts` — this one line is the difference between "+ New
+   * dashboard" being a feature and being a button that files something
+   * nowhere.
+   */
+  const nav = buildNav(useDashboards());
+
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'system') root.removeAttribute('data-theme');
@@ -119,7 +128,7 @@ export function App() {
        reads as a dead button. */
     <ToastProvider>
       <AppShell
-        nav={NAV}
+        nav={nav}
         currentPath={pathname}
         chromeless={chromeless}
         linkComponent={RouterLink}
@@ -161,6 +170,20 @@ export function App() {
             path="/insights"
             element={<InsightsPage filters={filters} onFiltersChange={setFilters} />}
           />
+          {/*
+            ⚠️ NO separate `/dashboards/new` route, unlike `/reports/new`.
+
+            The two are different on purpose. `new` in Reports opens a
+            DIFFERENT screen — the builder with no report. `new` in Dashboards
+            opens the SAME screen: the empty board you are about to make, with
+            its name dialog over it. A second route rendering the same element
+            would only reach `DashboardPage` with no `:id` at all, which reads
+            as Overview.
+
+            So `:id` catches it and the page branches on the literal. The other
+            half of the trap is closed in `lib/dashboards.ts`, which refuses to
+            mint `new` as a board id.
+          */}
           <Route
             path="/dashboards/:id"
             element={<DashboardPage filters={filters} onFiltersChange={setFilters} />}

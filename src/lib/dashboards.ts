@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from 'react';
+
 import type { TilePlacement } from '@realwired/ui';
 
 /* ============================================================================
@@ -185,5 +187,143 @@ export const DASHBOARDS: Dashboard[] = [
   },
 ];
 
+/* ============================================================================
+   The boards the user makes.
+
+   ⭐ `DASHBOARDS` above is the five we SHIP. This is the extensible half, and
+   between them they are the claim this file opens with — that a dashboard is a
+   name, a scope and an arrangement, so the one made live on a call is the same
+   kind of object as the five that ship, created the same way and reachable by
+   the same route.
+
+   The shape is `lib/boards.ts`'s, deliberately: one `useSyncExternalStore`
+   over a module-level value. A board's ARRANGEMENT lives there and a board's
+   IDENTITY lives here, and the split is the same one the type draws — a user
+   rearranging `Overview` has not made a new dashboard.
+
+   Session-scoped, like every other edit in the prototype. Reload restores the
+   five. Nothing above this line changes when it becomes durable.
+   ========================================================================== */
+
+let userBoards: Dashboard[] = [];
+
+const listeners = new Set<() => void>();
+const emit = () => {
+  for (const l of listeners) l();
+};
+const subscribe = (fn: () => void) => {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+};
+
+/* The snapshot must be REFERENTIALLY STABLE between emits — `useSyncExternalStore`
+   re-reads it on every render and loops forever on a fresh array each time. So
+   the concatenation is cached and rebuilt only when `userBoards` changes. */
+let snapshot: Dashboard[] = DASHBOARDS;
+const rebuild = () => {
+  snapshot = userBoards.length ? [...DASHBOARDS, ...userBoards] : DASHBOARDS;
+  emit();
+};
+const getSnapshot = () => snapshot;
+
+/** Every board, shipped then made, in the order the rail draws them. */
+export function useDashboards(): Dashboard[] {
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/**
+ * ⚠️ Reads the STORE, not the array.
+ *
+ * `lib/boards.ts` resolves a board's shipped arrangement through this on every
+ * render — `placementsFor` and `resetBoard` both call it. Left pointing at the
+ * const array, a board made on a call would have no arrangement to fall back
+ * to and would draw as "Dashboard not found" the moment its placements were
+ * read. This one line is what makes a new board a real board.
+ */
 export const findDashboard = (id: string): Dashboard | undefined =>
-  DASHBOARDS.find((d) => d.id === id);
+  snapshot.find((d) => d.id === id);
+
+/** True for a board the user made — the three `⋯` actions are theirs alone. */
+export const isUserBoard = (id: string): boolean => userBoards.some((d) => d.id === id);
+
+/**
+ * A url-safe id from the name, with a counter when it collides.
+ *
+ * Readable ids matter more here than they look: the route IS the id, and on a
+ * call `/dashboards/northgate-qbr` in the address bar says the board is a real
+ * object rather than a mode the app is in. A name of pure punctuation falls
+ * back to `board`, so the route is never `/dashboards/`.
+ */
+function idFor(name: string): string {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'board';
+  /* ⚠️ `new` is a ROUTE, not an id — `/dashboards/new` opens the create dialog.
+     A board actually called "New" would otherwise take an id that router
+     matches first, and the board would be unreachable from its own rail row. */
+  if (base !== 'new' && !findDashboard(base)) return base;
+  let n = 2;
+  while (findDashboard(`${base}-${n}`)) n += 1;
+  /* "New" becomes `new-2`, which is a legal id and an honest one. */
+  return `${base}-${n}`;
+}
+
+/**
+ * Make an empty board. Returns its id, for the caller to navigate to.
+ *
+ * It ships with the common filters and no scope — the three questions every
+ * board asks, and no opinion about the answers. A board someone made to answer
+ * their own question should not arrive pre-narrowed to ours.
+ */
+export function createDashboard(name: string): string {
+  const id = idFor(name);
+  userBoards = [
+    ...userBoards,
+    { id, name: name.trim(), blurb: 'Made in this session.', filters: COMMON_FILTERS, scope: {}, tiles: [] },
+  ];
+  rebuild();
+  return id;
+}
+
+/**
+ * Copy a board, tiles and all. Returns the new id.
+ *
+ * ⭐ `tiles` comes from the CALLER, not from `source.tiles`, and that is the
+ * whole point of the action. The arrangement worth copying is the one on the
+ * screen — the one with the tile you just dragged and the two you added — and
+ * that lives in `lib/boards.ts`. Copying the shipped tiles would hand back the
+ * board as it was before the demo started.
+ *
+ * The copy's own `tiles` then become ITS baseline, so `Reset layout` on a
+ * duplicate means "back to the copy as I made it", which is the only reading
+ * of reset that is useful on a board that was never shipped.
+ */
+export function duplicateDashboard(sourceId: string, name: string, tiles: TilePlacement[]): string {
+  const source = findDashboard(sourceId);
+  const id = idFor(name);
+  userBoards = [
+    ...userBoards,
+    {
+      id,
+      name: name.trim(),
+      blurb: `Copied from ${source?.name ?? 'another board'} in this session.`,
+      filters: source?.filters ?? COMMON_FILTERS,
+      scope: { ...(source?.scope ?? {}) },
+      tiles: tiles.map((t) => ({ ...t })),
+    },
+  ];
+  rebuild();
+  return id;
+}
+
+export function renameDashboard(id: string, name: string): void {
+  userBoards = userBoards.map((d) => (d.id === id ? { ...d, name: name.trim() } : d));
+  rebuild();
+}
+
+export function deleteDashboard(id: string): void {
+  userBoards = userBoards.filter((d) => d.id !== id);
+  rebuild();
+}

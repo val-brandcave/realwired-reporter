@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { widgetSize, type TilePlacement, type WidgetTypeId } from '@realwired/ui';
 
-import { DASHBOARDS, findDashboard } from './dashboards';
+import { findDashboard, useDashboards } from './dashboards';
 import type { Granularity } from './fields';
 import { lookupReport } from './library';
 
@@ -120,5 +120,17 @@ export function addToDashboard(dashboardId: string, reportId: string): boolean {
   return true;
 }
 
-/** Every board, for the builder's destination menu. */
-export const boardOptions = () => DASHBOARDS.map((d) => ({ id: d.id, name: d.name }));
+/**
+ * Every board, for the builder's destination menu.
+ *
+ * ⚠️ A HOOK now, not a plain function, and the change is load-bearing: the
+ * menu has to include a board made a minute ago on another route. Read off the
+ * const array it listed the five we ship and quietly omitted the one the
+ * demo just created — and "Add to dashboard" that cannot see your dashboard is
+ * the exact broken-button problem the comment at the top of this file exists
+ * to prevent.
+ */
+export function useBoardOptions(): { id: string; name: string }[] {
+  const dashboards = useDashboards();
+  return dashboards.map((d) => ({ id: d.id, name: d.name }));
+}

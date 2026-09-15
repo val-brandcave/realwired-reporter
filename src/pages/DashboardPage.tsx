@@ -1,17 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+  ActionMenu,
+  AlertDialog,
   Button,
   Callout,
   DashboardGrid,
   PageBody,
   PageHeader,
   TileMenu,
+  useToast,
   type TilePlacement,
   type WidgetTypeId,
 } from '@realwired/ui';
 
 import { AddReportRail } from '../components/AddReportRail';
+import { DashboardNameDialog } from '../components/DashboardNameDialog';
 import { useDashboardFilters } from '../components/DashboardFilters';
 import { ReportWidget } from '../components/ReportWidget';
 import { ORDERS } from '../data/orders';
@@ -27,7 +31,14 @@ import {
   setShape,
   useBoards,
 } from '../lib/boards';
-import { findDashboard } from '../lib/dashboards';
+import {
+  createDashboard,
+  deleteDashboard,
+  duplicateDashboard,
+  isUserBoard,
+  renameDashboard,
+  useDashboards,
+} from '../lib/dashboards';
 import { lookupReport } from '../lib/library';
 
 /**
@@ -67,7 +78,21 @@ export interface DashboardPageProps {
 
 export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) {
   const { id = 'overview' } = useParams();
-  const dashboard = findDashboard(id);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const toast = useToast();
+
+  /*
+   * ⚠️ Through the STORE, not `findDashboard` directly.
+   *
+   * Renaming a board has to change the title you are looking at. Read off the
+   * module function the page holds the object it found on mount, the rail
+   * updates and the page header does not — which reads as the rename having
+   * half worked.
+   */
+  const dashboards = useDashboards();
+  const dashboard = dashboards.find((d) => d.id === id);
+  const userBoard = isUserBoard(id);
 
   /*
    * The arrangement, the shape swaps and the pinned date bands live in
@@ -100,6 +125,32 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
    * The mode change is its own announcement, which is why there is no banner.
    */
   const [editing, setEditing] = useState(false);
+
+  /*
+   * Arriving already in edit mode, from the create flow.
+   *
+   * ⭐ A board created and then handed over in READ mode is a blank screen
+   * with an Edit button — it makes the user ask for permission to use the
+   * thing they just made. Creating a dashboard is a statement of intent to put
+   * something on it, so the next screen is the one where you can.
+   *
+   * ⚠️ An effect rather than a `useState` initialiser, and this is the trap:
+   * `/dashboards/:id` renders ONE component for every board, so navigating
+   * from Overview to a new board does not remount and an initialiser never
+   * runs again. `location.key` changes on every navigation, which is the only
+   * thing here that does.
+   */
+  useEffect(() => {
+    const arrival = location.state as { editing?: boolean; adding?: boolean } | null;
+    if (arrival?.editing) setEditing(true);
+    if (arrival?.adding) setAdding(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+
+  /* Which naming dialog is open, if any. One component serves all three —
+     see `DashboardNameDialog`. */
+  const [naming, setNaming] = useState<'create' | 'duplicate' | 'rename' | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const placements = placementsFor(board, id);
 
@@ -170,6 +221,60 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
    * chose by accident has not been reset.
    */
   const resetLayout = useCallback(() => resetBoard(id), [id]);
+
+  /* ── The three things you can do to a board, from the ⋯ menu ─────────────
+     They are grouped here rather than inline in the header because each one
+     ends by NAVIGATING, and a handler that changes the route is worth reading
+     next to the other two that do. */
+
+  /**
+   * Copy the board as it is NOW.
+   *
+   * ⭐ `placements`, not `dashboard.tiles`. The arrangement worth copying is
+   * the one on the screen — the tile just dragged, the two just added — and it
+   * lives in the boards store. Copying the shipped tiles would hand back the
+   * board as it was before the demo started, which is the opposite of what
+   * "duplicate this" means to the person who just changed it.
+   *
+   * The copy opens in READ mode. A duplicate arrives finished; a blank board
+   * does not, which is why only creation lands in edit.
+   */
+  const confirmDuplicate = useCallback(
+    (name: string) => {
+      const newId = duplicateDashboard(id, name, placements);
+      setNaming(null);
+      navigate(`/dashboards/${newId}`);
+    },
+    [id, placements, navigate]
+  );
+
+  const confirmRename = useCallback(
+    (name: string) => {
+      renameDashboard(id, name);
+      setNaming(null);
+      /* No toast. The title in front of you changes and the rail row changes
+         with it — an acknowledgement of something you can already see is
+         noise. */
+    },
+    [id]
+  );
+
+  /**
+   * Delete, then leave.
+   *
+   * Both are state updates in one batch, so the page never renders the gap:
+   * without the navigate it would paint "Dashboard not found" for the board
+   * the user just deleted, which reads as an error rather than a completed
+   * action. The toast is the one here that earns its place — the thing is gone
+   * and the screen you land on cannot say so.
+   */
+  const confirmDeleteBoard = useCallback(() => {
+    const name = dashboard?.name ?? 'dashboard';
+    setConfirmDelete(false);
+    navigate('/dashboards/overview');
+    deleteDashboard(id);
+    toast({ tone: 'success', title: `Deleted ${name}` });
+  }, [dashboard, id, navigate, toast]);
 
   const remove = useCallback(
     (tileId: string) => setPlacements(placements.filter((p) => p.id !== tileId)),
@@ -288,6 +393,48 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
     [placements, books, filters.range, board.shapes, board.grains, remove, editing]
   );
 
+  /*
+   * `/dashboards/new` — the create flow.
+   *
+   * ⭐ It is a ROUTE, not a modal opened from a button, and the reason is the
+   * rail: `New dashboard` is a row in a list of links, so it has to go
+   * somewhere. Making it the one row that fires a callback would break the
+   * keyboard model of the whole rail for the sake of a dialog the route can
+   * open anyway.
+   *
+   * What sits behind the dialog is the empty board itself. So pressing
+   * `Create dashboard` does not cut to a different screen — the dialog closes
+   * and the board that was already there becomes real and named. The
+   * transition is the point: it shows that a new dashboard is a thing that
+   * exists, not a form that was submitted.
+   */
+  if (id === 'new') {
+    return (
+      <>
+        <PageHeader title="New dashboard" />
+        <PageBody>
+          <EmptyBoard />
+        </PageBody>
+        <DashboardNameDialog
+          open
+          title="New dashboard"
+          confirmLabel="Create dashboard"
+          onConfirm={(name) => {
+            const newId = createDashboard(name);
+            navigate(`/dashboards/${newId}`, {
+              replace: true,
+              state: { editing: true, adding: true },
+            });
+          }}
+          /* Back where they were. `replace` on the create above keeps this
+             route out of the history, so a Back press after creating does not
+             reopen the dialog for a board that now exists. */
+          onCancel={() => navigate(-1)}
+        />
+      </>
+    );
+  }
+
   if (!dashboard) {
     return (
       <>
@@ -323,9 +470,19 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
         actions={
           editing ? (
             <>
-              <Button size="control" variant="ghost" onClick={resetLayout}>
-                Reset layout
-              </Button>
+              {/*
+                ⚠️ Only when there is something to reset TO.
+                `resetBoard` restores the board's shipped `tiles`, and a board
+                created empty ships with none — so on a new board the control
+                would quietly delete everything just added, under a word that
+                promises the opposite. A DUPLICATE does have a baseline (the
+                copy as made), so it keeps the button.
+              */}
+              {dashboard.tiles.length > 0 && (
+                <Button size="control" variant="ghost" onClick={resetLayout}>
+                  Reset layout
+                </Button>
+              )}
               <Button size="control" iconLeft="add" onClick={() => setAdding(true)}>
                 Add a widget
               </Button>
@@ -346,6 +503,50 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
               >
                 Edit dashboard
               </Button>
+              {/*
+                ⭐ What you can do to the board AS AN OBJECT, as opposed to the
+                two controls beside it, which change what the board SHOWS.
+                That is the line the menu draws, and it is why `Duplicate` sits
+                here rather than next to `Edit dashboard` as a third button:
+                three peer controls in one row would say these are three
+                equally likely things to do, and they are not.
+
+                `Duplicate` is offered on every board, including the five we
+                ship — taking `Transactions`, making it yours and stripping two
+                tiles is the likeliest way anyone gets a board of their own.
+                `Rename` and `Delete` are for boards the user made; renaming
+                `Overview` out from under the demo helps nobody.
+              */}
+              <ActionMenu
+                label="Board actions"
+                align="end"
+                items={[
+                  {
+                    id: 'duplicate',
+                    label: 'Duplicate board',
+                    icon: 'copy',
+                    onSelect: () => setNaming('duplicate'),
+                  },
+                  ...(userBoard
+                    ? [
+                        {
+                          id: 'rename',
+                          label: 'Rename…',
+                          icon: 'edit' as const,
+                          onSelect: () => setNaming('rename'),
+                        },
+                        {
+                          id: 'delete',
+                          label: 'Delete board',
+                          icon: 'trash' as const,
+                          tone: 'danger' as const,
+                          separatorBefore: true,
+                          onSelect: () => setConfirmDelete(true),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </>
           )
         }
@@ -414,11 +615,27 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
             as composed and takes away only the ability to change it. See the
             prop's own note in `DashboardGrid`.
           */}
-          <DashboardGrid
-            tiles={tiles}
-            editable={editing}
-            onPlacementsChange={setPlacements}
-          />
+          {placements.length === 0 ? (
+            <EmptyBoard
+              onAdd={
+                editing
+                  ? undefined
+                  : () => {
+                      /* The button says "Add a widget", so it adds a widget —
+                         entering edit mode is the app's business, not a step
+                         the reader should have to take first. */
+                      setEditing(true);
+                      setAdding(true);
+                    }
+              }
+            />
+          ) : (
+            <DashboardGrid
+              tiles={tiles}
+              editable={editing}
+              onPlacementsChange={setPlacements}
+            />
+          )}
         </div>
       </PageBody>
 
@@ -430,7 +647,69 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
         presentIds={present}
         onAdd={add}
       />
+
+      {/* One dialog, two of its three jobs. `initialName` is what makes them
+          different: duplicating arrives with a name to edit, renaming with the
+          name to replace. */}
+      <DashboardNameDialog
+        open={naming === 'duplicate' || naming === 'rename'}
+        title={naming === 'rename' ? 'Rename dashboard' : 'Duplicate dashboard'}
+        confirmLabel={naming === 'rename' ? 'Save name' : 'Duplicate board'}
+        initialName={naming === 'rename' ? dashboard.name : `${dashboard.name} (copy)`}
+        onConfirm={naming === 'rename' ? confirmRename : confirmDuplicate}
+        onCancel={() => setNaming(null)}
+      />
+
+      {/*
+        The description says what SURVIVES, because that is the thing anyone
+        hesitates over. A board is an arrangement of references; deleting it
+        deletes the arrangement and nothing else, and a reader who does not
+        know that will assume the worst and keep a board they do not want.
+      */}
+      <AlertDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={`Delete ${dashboard.name}?`}
+        description="The board and its arrangement go away. The reports on it stay in your library."
+        confirmLabel="Delete board"
+        tone="danger"
+        icon="trash"
+        onConfirm={confirmDeleteBoard}
+      />
     </>
+  );
+}
+
+/**
+ * A board with nothing on it.
+ *
+ * ⭐ An empty screen is an invitation to act, so this one is a sentence and a
+ * way forward rather than a report that a count is zero. The second line does
+ * real work: it names the two things the rail offers — a report someone
+ * already framed, or a bare shape to fill — so the reader knows what is behind
+ * the button before pressing it.
+ *
+ * No dashed drop-zone and no illustration. A dashed rectangle would be the
+ * generic empty state, and here it would also be a lie: tiles are placed from
+ * the rail, not dragged into the board from outside, so an outline promising a
+ * target that does not accept a drop is worse than no outline.
+ *
+ * `onAdd` is absent in edit mode, where `Add a widget` is already in the
+ * header two inches above. One button, in one place, per screen.
+ */
+function EmptyBoard({ onAdd }: { onAdd?: () => void }) {
+  return (
+    <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 py-16 text-center">
+      <p className="text-lg font-semibold text-ink">Nothing on this board yet.</p>
+      <p className="max-w-[46ch] text-base text-ink-2">
+        Add a saved report, or start a new one from a shape.
+      </p>
+      {onAdd && (
+        <Button className="mt-2" iconLeft="add" onClick={onAdd}>
+          Add a widget
+        </Button>
+      )}
+    </div>
   );
 }
 
