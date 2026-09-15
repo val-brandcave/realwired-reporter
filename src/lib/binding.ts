@@ -257,6 +257,14 @@ export interface ResolvedBinding {
    * control that lies about its own subject.
    */
   granularity: Granularity;
+  /**
+   * Present only for a binned spread.
+   *
+   * `medianIndex` is which BAND holds the middle observation. The chart takes
+   * it as `medianBin` and marks the band; it is not a position on the axis,
+   * because binned data cannot honestly claim one.
+   */
+  bins?: { medianIndex: number };
 }
 
 const X_KEY = 'category';
@@ -301,6 +309,31 @@ export function resolveBinding(
   const breakdown = binding.breakdown ? findDimension(binding.breakdown) : undefined;
   const target = binding.targetOf ? findMeasure(binding.targetOf) : undefined;
   const unit = measures[0]?.field.unit ?? 'count';
+
+  /* ---- a SPREAD rather than a comparison: bin one measure ---- */
+  if (binding.bins && !dimension && measures[0]) {
+    const binned = binMeasure(scoped, measures[0].field);
+    if (binned) {
+      return {
+        scoped,
+        measures,
+        granularity: grain,
+        series: 1,
+        bins: { medianIndex: binned.medianIndex },
+        dataset: {
+          xKey: X_KEY,
+          /* COUNTS, not the measure's own unit. The bars are how many orders
+             fell in a band; the measure is what the bands are OF, and that
+             goes to `binOf`. Leaving the unit as currency drew "$115" where
+             115 orders were meant. */
+          unit: 'count',
+          binOf: measures[0].field.label,
+          series: [{ key: seriesKey(0), label: 'Orders', colorIndex: 0 }],
+          data: binned.data,
+        },
+      };
+    }
+  }
 
   /* ---- no dimension: one row of whole-scope totals (stat, dial) ---- */
   if (!dimension) {
@@ -424,6 +457,108 @@ export function resolveBinding(
       data,
     },
   };
+}
+
+/**
+ * One measure, spread across bands.
+ *
+ * ## Why this lives in the app and not in the chart
+ *
+ * `DistributionViz` takes bands and counts. It cannot bin for itself: by the
+ * time a dataset reaches a chart the rows are gone, and a median recovered
+ * from band counts would be a guess presented as a measurement. So the caller
+ * bins, and the caller says which band holds the middle observation.
+ *
+ * ## The band width is chosen, not fixed
+ *
+ * A fee book with a hard tail — which this one has — makes the naive choice
+ * wrong in both directions. Banding to the MAXIMUM gives forty bands with one
+ * order in the last; banding to a fixed width gives a first band holding
+ * everything. So the width comes off the 95th percentile on a 1/2/5 x 10^n
+ * progression, five closed bands, and everything above the top boundary goes
+ * into ONE open-ended band. That is what makes the tail legible as a tail
+ * rather than as forty empty columns.
+ *
+ * ⚠️ The open band is why the count is honest and the mean is not recoverable
+ * from this chart. Do not let anything downstream compute an average from
+ * these bars.
+ */
+function binMeasure(
+  rows: OrderRow[],
+  field: MeasureField
+): { data: WidgetRow[]; medianIndex: number } | null {
+  const read = field.get;
+  if (!read) return null;
+
+  const values = rows
+    .map(read)
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+    .sort((a, b) => a - b);
+
+  if (values.length === 0) return null;
+
+  const CLOSED_BANDS = 5;
+
+  /*
+   * The band width comes off the MEDIAN, not off the range.
+   *
+   * ⚠️ MEASURED, and the first attempt was wrong. Anchoring on the 95th
+   * percentile put 83.4% of orders in one band and drew the other five as
+   * slivers — true, but a chart that spends five sixths of its width on 16.6%
+   * of the book is not showing a spread, it is showing one bar.
+   *
+   * A fee book is a skewed positive distribution, so the median is the scale
+   * that matters: a first band roughly one median wide holds about half the
+   * orders, and the structure inside the bulk becomes visible instead of being
+   * compressed into a single column. The artboard reaches the same place from
+   * its own numbers — it draws $20 bands against a median of $18.
+   *
+   * The tail is not lost, it moves into the open band, which is what an open
+   * band is for.
+   */
+  const median = values[Math.floor((values.length - 1) / 2)];
+  const p95 = values[Math.min(values.length - 1, Math.floor(values.length * 0.95))];
+
+  /* A median of zero says half the book is unpriced — fall back to the spread
+     so the chart still draws something rather than banding on nothing. */
+  const raw = median > 0 ? median : p95 / CLOSED_BANDS;
+  if (!(raw > 0)) return null;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const step =
+    [1, 2, 5, 10].map((m) => m * magnitude).find((candidate) => candidate >= raw) ?? 10 * magnitude;
+
+  const money = field.unit === 'usd';
+  /*
+   * The unit is written on the FIRST band and again on the open one, and
+   * nowhere else — the artboard's own economy. The axis establishes what it
+   * is counting once, restates it where the band stops being a range, and
+   * spends no width repeating a dollar sign six times.
+   */
+  const amount = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  const money$ = (n: number) => (money ? `$${amount(n)}` : amount(n));
+
+  const counts = new Array<number>(CLOSED_BANDS + 1).fill(0);
+  const bandOf = (v: number) => Math.min(CLOSED_BANDS, Math.floor(v / step));
+  for (const v of values) counts[bandOf(v)] += 1;
+
+  const label = (i: number) =>
+    i === CLOSED_BANDS
+      ? `${money$(step * CLOSED_BANDS)}+`
+      : i === 0
+        ? `${money$(0)}–${amount(step)}`
+        : `${amount(step * i)}–${amount(step * (i + 1))}`;
+
+  const data: WidgetRow[] = counts.map((count, i) => ({
+    [X_KEY]: label(i),
+    [seriesKey(0)]: count,
+  }));
+
+  /*
+   * The median BAND, by index. The true median is known here because the raw
+   * values are — it is deliberately not passed on as a number, because the
+   * chart can only honestly say which band the middle observation fell in.
+   */
+  return { data, medianIndex: bandOf(median) };
 }
 
 /* ============================================================================

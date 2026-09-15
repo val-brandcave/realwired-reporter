@@ -317,6 +317,10 @@ export function ReportWidget({
              where it does more than annotate: it strips the delta's colour.
              The frame's chip is the other half of the same fact. */
           ...(partialPeriod ? { partialPeriod } : {}),
+          /* Which band holds the middle observation. Only the resolver knows
+             it — the chart has counts, and a median inferred from counts is a
+             guess wearing a measurement's clothes. */
+          ...(resolved.bins ? { medianBin: resolved.bins.medianIndex } : {}),
         }}
       />
     </WidgetFrame>
