@@ -120,7 +120,7 @@ export const DASHBOARDS: Dashboard[] = [
        */
       { id: 'r-turnaround-sla', x: 0, y: 5, w: 6, h: 5 },
       { id: 'r-status-mix', x: 6, y: 5, w: 6, h: 5 },
-      { id: 'r-org-breakdown', x: 0, y: 10, w: 12, h: 4 },
+      { id: 'r-org-breakdown', x: 0, y: 10, w: 12, h: 8 },
     ],
   },
   {
@@ -137,7 +137,7 @@ export const DASHBOARDS: Dashboard[] = [
       { id: 'r-fee-by-category', x: 6, y: 0, w: 6, h: 3 },
       { id: 'r-top-orgs', x: 0, y: 2, w: 6, h: 4 },
       { id: 'r-fee-distribution', x: 6, y: 3, w: 6, h: 3 },
-      { id: 'r-category-table', x: 0, y: 6, w: 12, h: 4 },
+      { id: 'r-category-table', x: 0, y: 6, w: 12, h: 7 },
     ],
   },
   {
@@ -152,7 +152,7 @@ export const DASHBOARDS: Dashboard[] = [
       { id: 'r-system-fee', x: 0, y: 0, w: 4, h: 2 },
       { id: 'r-revenue-by-source', x: 4, y: 0, w: 8, h: 3 },
       { id: 'r-fee-distribution', x: 0, y: 2, w: 4, h: 3 },
-      { id: 'r-org-breakdown', x: 0, y: 5, w: 12, h: 4 },
+      { id: 'r-org-breakdown', x: 0, y: 5, w: 12, h: 8 },
     ],
   },
   {
@@ -166,7 +166,7 @@ export const DASHBOARDS: Dashboard[] = [
     tiles: [
       { id: 'r-top-orgs', x: 0, y: 0, w: 6, h: 4 },
       { id: 'r-utilization', x: 6, y: 0, w: 6, h: 4 },
-      { id: 'r-org-breakdown', x: 0, y: 4, w: 12, h: 4 },
+      { id: 'r-org-breakdown', x: 0, y: 4, w: 12, h: 8 },
     ],
   },
   {
@@ -180,7 +180,7 @@ export const DASHBOARDS: Dashboard[] = [
     tiles: [
       { id: 'r-review-times', x: 0, y: 0, w: 5, h: 3 },
       { id: 'r-order-activity', x: 5, y: 0, w: 7, h: 3 },
-      { id: 'r-category-table', x: 0, y: 3, w: 12, h: 4 },
+      { id: 'r-category-table', x: 0, y: 3, w: 12, h: 7 },
     ],
   },
 ];
