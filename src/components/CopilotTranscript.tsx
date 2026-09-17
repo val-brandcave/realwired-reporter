@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Callout,
@@ -11,7 +11,6 @@ import {
 } from '@realwired/ui';
 
 import { ReportWidget } from './ReportWidget';
-import { DashboardNameDialog } from './DashboardNameDialog';
 import { ProposalCard } from './ProposalCard';
 import { ORDERS } from '../data/orders';
 import { bindingDateBasis } from '../lib/binding';
@@ -23,6 +22,8 @@ import { saveReport } from '../lib/library';
 import { packBoard } from '../lib/pack';
 import {
   ask,
+  beginBuild,
+  setProposalName,
   settleProposal,
   toggleCandidate,
   useThread,
@@ -47,6 +48,26 @@ import {
    makes "ask in the drawer, open /chat, the turn is there" true.
    ========================================================================== */
 
+/**
+ * How long the card shows its building state.
+ *
+ * ⚠️ The work is genuinely instant — a few writes to three in-memory stores —
+ * so this is a presentation decision and it should be defended as one rather
+ * than smuggled in. A state change the eye never catches reads as the screen
+ * glitching, and the reader is left unsure whether their board was built or
+ * whether something else happened. One beat makes cause and effect legible.
+ *
+ * It matches `THINKING_MS` in `lib/thread.ts`, which is the same judgement
+ * already made for answers: long enough to read as work, short enough that
+ * nobody waits. Creating a board and answering a question should not run at
+ * two different speeds in one conversation.
+ *
+ * ⛔ It is NOT a fake progress bar and must not become one. `ProgressStages`
+ * exists in the library for real multi-second work and its own note says so;
+ * naming stages here would be inventing a wait that does not happen.
+ */
+const BUILD_MS = 550;
+
 export interface CopilotTranscriptProps {
   /**
    * How much height an answer widget gets.
@@ -67,15 +88,6 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
   const { turns, pending } = useThread();
 
   const bottom = useRef<HTMLDivElement>(null);
-
-  /*
-   * The proposal waiting on a name.
-   *
-   * Local, not in the store, because exactly one transcript is ever mounted —
-   * the drawer is not summonable on `/chat`, since that page IS the copilot.
-   * A second instance would mean two dialogs racing for the same turn.
-   */
-  const [naming, setNaming] = useState<ProposalTurn | null>(null);
 
   /* Follow the conversation down. `smooth` because this IS a response to
      something the reader did. */
@@ -127,7 +139,7 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
    *
    * ⭐ The whole flow lands in these few lines, and every call is one that
    * already existed: save each spec to the library, mint the board, pack the
-   * placements, set them, go there.
+   * placements, set them.
    *
    * ⚠️ `setPlacements`, NOT `addToDashboard` in a loop. `addToDashboard` places
    * one report at `x: 0` on the first free row — correct for a single widget
@@ -135,13 +147,32 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
    * as five full-width bands stacked down the page. `lib/pack.ts` lays them out
    * by shape the way the five shipped boards are laid out; this writes that
    * arrangement in one go.
+   *
+   * ⛔ IT DOES NOT NAVIGATE, and that is a correction rather than an omission.
+   * It used to end with `navigate(...)`, so the page jumped to the new board
+   * while the card was still offering `Open it` — the reader arrived somewhere
+   * they had not asked to go, and the button that was supposed to take them
+   * there had already been overtaken. Worse in the drawer, where the whole
+   * point is that you stay on the board you were looking at.
+   *
+   * The acknowledgements are the ones that do not move anybody: the card
+   * settles in place, and the rail's count ticks up. `Open it` is the only
+   * thing that changes the route, and the reader presses it.
    */
-  const createBoard = useCallback(
-    (turn: ProposalTurn, name: string) => {
-      const chosen = turn.composition.candidates
-        .filter((c) => turn.selected.includes(c.report.id))
-        .map((c) => c.report);
+  const createBoard = useCallback((turn: ProposalTurn) => {
+    const name = turn.name.trim();
+    const chosen = turn.composition.candidates
+      .filter((c) => turn.selected.includes(c.report.id))
+      .map((c) => c.report);
 
+    if (!name || chosen.length === 0) return;
+
+    /* Show the work before doing it. The card needs one frame in its building
+       state, or the reader sees the offer become a finished board with nothing
+       in between — which is exactly the "it suddenly updated" complaint. */
+    beginBuild(turn.id);
+
+    window.setTimeout(() => {
       /* Into the library first. The board holds report REFERENCES — a
          placement whose id resolves to nothing renders an empty tile, which is
          the exact trap `lookupReport` exists to close. */
@@ -151,21 +182,8 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
       setPlacements(boardId, packBoard(chosen));
 
       settleProposal(turn.id, 'created', { id: boardId, name, widgets: chosen.length });
-      setNaming(null);
-
-      toast({
-        tone: 'success',
-        title: `${name} created`,
-        description: `${chosen.length} widget${chosen.length === 1 ? '' : 's'} added and saved to your reports.`,
-        action: { label: 'Open it', onClick: () => navigate(`/dashboards/${boardId}`) },
-      });
-
-      /* Land on it. The reader asked for a dashboard; showing them the board
-         rather than a confirmation is the answer to what they asked. */
-      navigate(`/dashboards/${boardId}`);
-    },
-    [toast, navigate]
-  );
+    }, BUILD_MS);
+  }, []);
 
   return (
     <>
@@ -193,7 +211,8 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
                 <ProposalCard
                   turn={turn}
                   onToggle={(reportId) => toggleCandidate(turn.id, reportId)}
-                  onCreate={() => setNaming(turn)}
+                  onRename={(name) => setProposalName(turn.id, name)}
+                  onCreate={() => createBoard(turn)}
                   onDismiss={() => settleProposal(turn.id, 'dismissed')}
                   onOpenBoard={(id) => navigate(`/dashboards/${id}`)}
                 />
@@ -273,17 +292,6 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
 
       <div ref={bottom} />
 
-      {/* The name, asked after the widgets are chosen — so you are naming
-          something you have already seen. Same component as New, Duplicate and
-          Rename; the words are what differ. */}
-      <DashboardNameDialog
-        open={naming !== null}
-        title="Name this dashboard"
-        confirmLabel="Create dashboard"
-        initialName={naming?.composition.parsed.suggestedName ?? ''}
-        onConfirm={(name) => naming && createBoard(naming, name)}
-        onCancel={() => setNaming(null)}
-      />
     </>
   );
 }

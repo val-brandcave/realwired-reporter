@@ -64,6 +64,18 @@ export interface ProposalTurn {
    */
   selected: string[];
   /**
+   * The name the board will be given.
+   *
+   * ⭐ On the turn, and seeded from the composer's suggestion, because naming
+   * happens INSIDE the card now rather than in a dialog over it. It was a
+   * `DashboardNameDialog` until 17 Sept and that was wrong in a way a
+   * screenshot makes obvious: a modal dimmed the board while asking about it,
+   * over a drawer that is non-modal precisely so the board stays visible — and
+   * it put a second `Create dashboard` button on screen beside the card's own.
+   * One flow, one button, in the conversation where the flow is happening.
+   */
+  name: string;
+  /**
    * Where the offer got to.
    *
    * It has to live on the turn rather than in the component, because the same
@@ -71,7 +83,7 @@ export interface ProposalTurn {
    * has to settle the copy of it on `/chat`, and a `useState` inside the card
    * would leave the other surface still offering a board that now exists.
    */
-  status: 'open' | 'created' | 'dismissed';
+  status: 'open' | 'building' | 'created' | 'dismissed';
   /** Set once created, so the settled card can link to what it made. */
   board?: { id: string; name: string; widgets: number };
 }
@@ -166,6 +178,7 @@ export function ask(question: string): void {
                  reader edits a proposal; they do not assemble one from
                  nothing, which is what an all-unticked list would ask for. */
               selected: composition.candidates.filter((c) => c.recommended).map((c) => c.report.id),
+              name: composition.parsed.suggestedName,
               status: 'open' as const,
             };
           })()
@@ -207,6 +220,31 @@ export function startNew(): void {
 /* ============================================================================
    Resolving a proposal
    ========================================================================== */
+
+/** Rename the board a proposal will create. */
+export function setProposalName(turnId: string, name: string): void {
+  set({
+    turns: state.turns.map((t) =>
+      t.kind === 'proposal' && t.id === turnId ? { ...t, name } : t
+    ),
+  });
+}
+
+/**
+ * Start building. The card shows the work while it happens.
+ *
+ * A separate state from `created` because the two say different things and the
+ * reader needs to see the first one happen: a card that went straight from an
+ * offer to a finished board would be the "it suddenly updated" complaint that
+ * produced this function.
+ */
+export function beginBuild(turnId: string): void {
+  set({
+    turns: state.turns.map((t) =>
+      t.kind === 'proposal' && t.id === turnId ? { ...t, status: 'building' as const } : t
+    ),
+  });
+}
 
 /** Tick or untick one candidate on an open proposal. */
 export function toggleCandidate(turnId: string, reportId: string): void {
