@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import {
   AppShell,
+  Button,
   PageBody,
   PageHeader,
   ToastProvider,
@@ -24,6 +25,8 @@ import { Brandmark } from './components/Brandmark';
 // be back before this is shown to the client. See components/DemoBanner.tsx.
 // import { DemoBanner } from './components/DemoBanner';
 import { RouterLink } from './components/RouterLink';
+import { CopilotDrawer } from './components/CopilotDrawer';
+import { toggleDrawer } from './lib/thread';
 
 /**
  * A page that does not exist yet. It says what is coming and what it will do,
@@ -113,7 +116,24 @@ export function App() {
    * dashboard" being a feature and being a button that files something
    * nowhere.
    */
-  const nav = buildNav(useDashboards());
+  const dashboards = useDashboards();
+  const nav = buildNav(dashboards);
+
+  /*
+   * The copilot drawer, and where it is NOT offered.
+   *
+   * ⛔ Not on `/reports/*`. That route is chromeless on purpose — the builder
+   * needs the width and escapes the shell deliberately — so there is no header
+   * to summon from, and a 560px panel would take more than a third of a
+   * three-column workbench that already yields to one column at 1280.
+   *
+   * ⛔ Not on `/chat`, because that page IS the copilot. A drawer showing the
+   * same conversation over the page showing the same conversation is two
+   * scrollbars on one thread, and it would also mean two `CopilotTranscript`s
+   * mounted at once, racing for the same name dialog.
+   */
+  const copilotSurface = pathname === '/chat';
+  const showCopilot = !chromeless && !copilotSurface;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -147,7 +167,24 @@ export function App() {
            * would make the chrome read as a stranger's account.
            */
           end: (
-            <UserMenu
+            <>
+              {/*
+                The summon control, in the one piece of chrome that is always
+                there.
+
+                ⭐ Not a floating action button: the rail and the header carry
+                every other destination in this app, and a circle hovering over
+                the board would be the only control belonging to no structure.
+                It sits before the avatar because it is a tool and the avatar
+                is an account — the trailing-most slot is where a user menu is
+                looked for.
+              */}
+              {showCopilot && (
+                <Button variant="ghost" size="sm" iconLeft="comment" onClick={toggleDrawer}>
+                  Copilot
+                </Button>
+              )}
+              <UserMenu
               name="Brenda Wilson"
               email="brenda@realwired.com"
               theme={theme}
@@ -156,8 +193,9 @@ export function App() {
                 { id: 'profile', label: 'Your profile', icon: 'user' },
                 { id: 'settings', label: 'Settings', icon: 'settings' },
                 { id: 'signout', label: 'Sign out', icon: 'logout', danger: true },
-              ]}
-            />
+                ]}
+              />
+            </>
           ),
         }}
       >
@@ -208,6 +246,19 @@ export function App() {
             }
           />
         </Routes>
+
+        {/*
+          The drawer is mounted OUTSIDE the routes, beside them.
+
+          ⭐ Deliberate, and it is the other half of hoisting the turns into
+          `lib/thread.ts`. Rendered inside a route it would unmount on every
+          navigation — so asking a question on Overview and clicking through to
+          Transactions to watch the answer land would close the panel mid-
+          sentence, which is the exact move a non-modal drawer exists to allow.
+
+          It draws nothing until it is opened; `Sheet` portals its content.
+        */}
+        {showCopilot && <CopilotDrawer />}
       </AppShell>
     </ToastProvider>
   );

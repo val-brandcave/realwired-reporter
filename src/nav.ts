@@ -28,6 +28,23 @@ export function buildNav(dashboards: Dashboard[]): NavNode[] {
       label: 'Dashboards',
       icon: 'dashboard',
       href: '/dashboards',
+      /*
+       * How many boards there are — EVERY board, shipped and made.
+       *
+       * ⭐ It counts the total rather than only the ones the user made, and
+       * that is the whole reason it earns a place: a count of user boards
+       * starts at zero, and a zero in a nav row reads as something broken
+       * rather than as a fact. The total is always true, and on a call it
+       * MOVES — five becomes six the moment a board is created in front of the
+       * client, in the same rail row they were just looking at. A number that
+       * never changes is decoration; this one is the receipt for the thing
+       * that just happened.
+       *
+       * ⚠️ It counts `dashboards`, not `children` — the children array also
+       * carries the "New dashboard" row, which is a control and not a board.
+       * Counting the rail's own rows would report six boards on a fresh load.
+       */
+      badge: dashboards.length,
       children: [
         ...dashboards.map((d) => ({
           id: d.id,

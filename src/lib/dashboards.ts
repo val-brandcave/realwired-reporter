@@ -91,12 +91,24 @@ export const DASHBOARDS: Dashboard[] = [
     filters: [...COMMON_FILTERS, 'segment'],
     scope: {},
     tiles: [
-      { id: 'r-completed-orders', x: 0, y: 0, w: 3, h: 2 },
-      { id: 'r-client-fee', x: 3, y: 0, w: 3, h: 2 },
-      { id: 'r-avg-turnaround', x: 6, y: 0, w: 3, h: 2 },
-      { id: 'r-system-fee', x: 9, y: 0, w: 3, h: 2 },
-      { id: 'r-order-activity', x: 0, y: 2, w: 8, h: 3 },
-      { id: 'r-category-mix', x: 8, y: 2, w: 4, h: 3 },
+      /*
+       * ⚠️ h:3, not h:2 — MEASURED 17 Sept. `Total client fee` carries the
+       * caption "across 85 organizations", so its content is 59px; at h:2 the
+       * plot area is 45px once the provenance footer has taken its space, and
+       * the caption was sliced. The other three have no caption and fitted,
+       * which is how this survived: one tile in four was wrong, and only the
+       * one whose figure had something extra to say.
+       *
+       * The whole band moves together — a row of stats at two different
+       * heights leaves a notch in the top edge of the board. `stat`'s
+       * catalogue default is [3, 3]; these now follow it. See TRAPS §4.x.
+       */
+      { id: 'r-completed-orders', x: 0, y: 0, w: 3, h: 3 },
+      { id: 'r-client-fee', x: 3, y: 0, w: 3, h: 3 },
+      { id: 'r-avg-turnaround', x: 6, y: 0, w: 3, h: 3 },
+      { id: 'r-system-fee', x: 9, y: 0, w: 3, h: 3 },
+      { id: 'r-order-activity', x: 0, y: 3, w: 8, h: 3 },
+      { id: 'r-category-mix', x: 8, y: 3, w: 4, h: 3 },
       /*
        * ⚠️ FOUR rows, not three, and it was three until 2026-09-11.
        *
@@ -120,9 +132,9 @@ export const DASHBOARDS: Dashboard[] = [
        * a single default pair cannot express; when a shape's rows are
        * data-driven, measure the tile rather than trusting `def`.
        */
-      { id: 'r-turnaround-sla', x: 0, y: 5, w: 6, h: 5 },
-      { id: 'r-status-mix', x: 6, y: 5, w: 6, h: 5 },
-      { id: 'r-org-breakdown', x: 0, y: 10, w: 12, h: 8 },
+      { id: 'r-turnaround-sla', x: 0, y: 6, w: 6, h: 5 },
+      { id: 'r-status-mix', x: 6, y: 6, w: 6, h: 5 },
+      { id: 'r-org-breakdown', x: 0, y: 11, w: 12, h: 8 },
     ],
   },
   {
@@ -133,13 +145,23 @@ export const DASHBOARDS: Dashboard[] = [
        differently, and this is the only board where that is the question. */
     filters: [...COMMON_FILTERS, 'segment', 'orderType'],
     scope: { status: ['Complete'] },
+    /*
+     * ⚠️ The two stats are h:3, not h:2, and the rows below moved with them.
+     *
+     * MEASURED 17 Sept: at h:2 `Total client fee` held 59px of content in a
+     * 45px plot and its caption was sliced. This board scopes to `Complete`,
+     * so every widget carries a coverage GAP and therefore a two-line
+     * provenance footer — which is exactly the case `stat`'s old `def: [3, 2]`
+     * could not draw. The catalogue default is [3, 3] now; these placements
+     * follow it rather than sitting under it. See TRAPS §4.x.
+     */
     tiles: [
-      { id: 'r-client-fee', x: 0, y: 0, w: 3, h: 2 },
-      { id: 'r-system-fee', x: 3, y: 0, w: 3, h: 2 },
+      { id: 'r-client-fee', x: 0, y: 0, w: 3, h: 3 },
+      { id: 'r-system-fee', x: 3, y: 0, w: 3, h: 3 },
       { id: 'r-fee-by-category', x: 6, y: 0, w: 6, h: 3 },
-      { id: 'r-top-orgs', x: 0, y: 2, w: 6, h: 4 },
+      { id: 'r-top-orgs', x: 0, y: 3, w: 6, h: 4 },
       { id: 'r-fee-distribution', x: 6, y: 3, w: 6, h: 3 },
-      { id: 'r-category-table', x: 0, y: 6, w: 12, h: 7 },
+      { id: 'r-category-table', x: 0, y: 7, w: 12, h: 7 },
     ],
   },
   {
@@ -151,10 +173,12 @@ export const DASHBOARDS: Dashboard[] = [
     filters: [...COMMON_FILTERS],
     scope: { status: ['Complete'] },
     tiles: [
-      { id: 'r-system-fee', x: 0, y: 0, w: 4, h: 2 },
+      /* h:3 — the catalogue default, and this board scopes to `Complete` so
+         its footers run to two lines. See the note on Transactions. */
+      { id: 'r-system-fee', x: 0, y: 0, w: 4, h: 3 },
       { id: 'r-revenue-by-source', x: 4, y: 0, w: 8, h: 3 },
-      { id: 'r-fee-distribution', x: 0, y: 2, w: 4, h: 3 },
-      { id: 'r-org-breakdown', x: 0, y: 5, w: 12, h: 8 },
+      { id: 'r-fee-distribution', x: 0, y: 3, w: 4, h: 3 },
+      { id: 'r-org-breakdown', x: 0, y: 6, w: 12, h: 8 },
     ],
   },
   {
