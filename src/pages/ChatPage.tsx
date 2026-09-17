@@ -133,6 +133,10 @@ export function ChatPage() {
               onChange={setDraft}
               onSubmit={send}
               busy={Boolean(pending)}
+              /* Both copilot surfaces offer it, for the same reason one
+                 thread serves both: they are one assistant. See the note in
+                 `CopilotDrawer`. */
+              dictation
               placeholder="Ask about your orders, fees or turnaround"
             />
           </div>

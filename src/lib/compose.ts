@@ -224,7 +224,29 @@ const DOCUMENT_WORDS = [
 function subjectOf(q: string): string {
   let s = q;
   for (const w of DOCUMENT_WORDS) s = s.split(w).join(' ');
-  return s;
+  return normalise(s);
+}
+
+/**
+ * One spelling for comparison — lowercase, `&` written out, spaces collapsed.
+ *
+ * ⭐ The ampersand is here because of DICTATION, and it is not a nicety.
+ * Speech recognition transcribes "Cornerstone Bank *and* Trust"; the data
+ * holds "Cornerstone Bank *&* Trust". Compared literally the full name never
+ * matches, so a dictated request falls back to the first-word shorthand — and
+ * where that shorthand is ambiguous (two clients beginning "Meridian") it
+ * correctly matches nothing, so the reader silently gets a whole-book board
+ * instead of the client they actually named.
+ *
+ * Normalising both sides is what makes SPEAKING a client's name work as well
+ * as typing it, which is the entire point of offering a microphone.
+ */
+function normalise(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 const rangeById = (id: string): DateRange => DATE_RANGES.find((r) => r.id === id) ?? DEFAULT_RANGE;
@@ -261,7 +283,7 @@ export function parse(question: string): ParsedRequest {
     const values = dimensionValues(dim, ORDERS).filter((v) => v !== 'Unassigned');
 
     /* Named in full. */
-    let hits = values.filter((v) => subject.includes(v.toLowerCase()));
+    let hits = values.filter((v) => subject.includes(normalise(v)));
 
     /*
      * A shortened organisation name — "Northgate" for "Northgate Bank".
@@ -286,7 +308,7 @@ export function parse(question: string): ParsedRequest {
     if (dim.key === 'org' && hits.length === 0) {
       const byFirstWord = new Map<string, string[]>();
       for (const v of values) {
-        const first = v.toLowerCase().split(' ')[0];
+        const first = normalise(v).split(' ')[0];
         if (first.length < 5) continue;
         byFirstWord.set(first, [...(byFirstWord.get(first) ?? []), v]);
       }
@@ -303,7 +325,7 @@ export function parse(question: string): ParsedRequest {
      * one. They named one client; the longer match is the one they named.
      */
     hits = hits.filter(
-      (v) => !hits.some((other) => other !== v && other.toLowerCase().includes(v.toLowerCase()))
+      (v) => !hits.some((other) => other !== v && normalise(other).includes(normalise(v)))
     );
 
     if (hits.length) {

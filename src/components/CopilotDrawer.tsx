@@ -107,6 +107,19 @@ export function CopilotDrawer() {
           onChange={setDraft}
           onSubmit={send}
           busy={Boolean(pending)}
+          /*
+           * ⭐ Dictation, and it earns its place here more than anywhere else
+           * in the app. This product's primary reader is not a query author —
+           * saying "build me a dashboard for Northgate's quarterly review" is
+           * a sentence people produce naturally, and typing it is the step
+           * that makes a copilot feel like a search box.
+           *
+           * ⚠️ The first press raises the browser's own microphone permission
+           * prompt, which is a modal we do not control. Grant it on the demo
+           * machine before a call rather than discovering it in front of one.
+           * Chrome and Edge only; the control is absent elsewhere.
+           */
+          dictation
           placeholder="Ask, or say “build me a dashboard for…”"
         />
       }
