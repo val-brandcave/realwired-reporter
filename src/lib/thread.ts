@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-import { compose, detectIntent, type Composition } from './compose';
+import { compose, readRequest, type Composition } from './compose';
 import { THREADS, route, type CopilotAnswer } from './copilot';
 
 /* ============================================================================
@@ -88,7 +88,26 @@ export interface ProposalTurn {
   board?: { id: string; name: string; widgets: number };
 }
 
-export type Turn = AnswerTurn | ProposalTurn;
+/**
+ * A turn the copilot could not answer.
+ *
+ * ⭐ It did not exist until 17 Sept, and its absence was the most visible
+ * defect in the whole surface: `route` seeded its best match with the first
+ * scripted answer and returned it unconditionally, so ANY unrecognised
+ * question came back with the August fee answer — a real widget, a confident
+ * paragraph, and nothing saying it had missed. From the outside the copilot
+ * appeared to do the same thing whatever you typed, because it did.
+ *
+ * A scripted assistant is allowed to know five things. It is not allowed to
+ * answer a sixth question as though it were one of the five.
+ */
+export interface UnmatchedTurn {
+  kind: 'unmatched';
+  id: string;
+  question: string;
+}
+
+export type Turn = AnswerTurn | ProposalTurn | UnmatchedTurn;
 
 interface ThreadState {
   turns: Turn[];
@@ -165,10 +184,13 @@ export function ask(question: string): void {
 
   timer = setTimeout(() => {
     seq += 1;
+    /* One read of the request: what it means, and what it is about. */
+    const { intent, parsed } = readRequest(q);
+
     const turn: Turn =
-      detectIntent(q) === 'compose'
+      intent === 'compose'
         ? (() => {
-            const composition = compose(q);
+            const composition = compose(q, parsed);
             return {
               kind: 'proposal' as const,
               id: `compose-${seq}`,
@@ -183,7 +205,10 @@ export function ask(question: string): void {
             };
           })()
         : (() => {
-            const thread = route(q);
+            const { thread, matched } = route(q);
+            /* ⛔ Nothing matched — say so rather than returning the nearest
+               scripted answer. See `UnmatchedTurn`. */
+            if (!matched) return { kind: 'unmatched' as const, id: `miss-${seq}`, question: q };
             set({ activeThreadId: thread.id });
             return { kind: 'answer' as const, id: `${thread.id}-${seq}`, question: q, answer: thread.answer };
           })();

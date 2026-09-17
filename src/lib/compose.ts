@@ -65,19 +65,39 @@ import type { Report } from './reports';
  * for, in the middle of a conversation they were having.
  */
 const BOARD_NOUNS = ['dashboard', 'board', 'view', 'workspace', 'scorecard'];
-const MAKE_VERBS = [
-  'build',
-  'make',
-  'create',
-  'set up',
-  'setup',
-  'start',
-  'new',
-  'put together',
-  'i need',
-  'i want',
-  'give me',
-  'can you',
+
+/**
+ * The openings that make something a QUESTION.
+ *
+ * ⭐ This is the whole test now, and the inversion is the point. It used to
+ * require a board noun AND a making verb, so only a full imperative sentence
+ * composed — "build me a dashboard for Northgate". Anything shorter fell
+ * through to the answer router, and because that router had no way to say it
+ * had not understood, a fragment like "Northgate quarterly review" came back
+ * with a scripted answer about August fees.
+ *
+ * A copilot with two jobs — answer, or build — can read a request the way a
+ * person would: a QUESTION gets an answer, and a NOUN PHRASE naming a scope is
+ * a request for a thing. "Northgate quarterly review" is the name of a
+ * deliverable, not an enquiry.
+ *
+ * ⚠️ The asymmetry justifies erring toward composing. A proposal is a
+ * checklist with `Not now` on it, so guessing wrong costs one glance. Guessing
+ * the other way answers a question nobody asked, with a real chart under it.
+ */
+/**
+ * Interrogatives that ask the copilot to PICK from what already exists.
+ *
+ * Only these keep a sentence containing "dashboard" on the answering side.
+ * "Which dashboard shows my fees" is a question about the boards you have;
+ * "can you make me a dashboard" is a request for one more.
+ */
+const SELECTING_OPENERS = ['which', 'what', 'whose', 'how'];
+
+const QUESTION_OPENERS = [
+  'why', 'what', 'which', 'who', 'whose', 'how', 'when', 'where',
+  'is', 'are', 'was', 'were', 'do', 'does', 'did', 'can', 'could',
+  'should', 'will', 'would', 'has', 'have', 'am',
 ];
 
 export type Intent = 'compose' | 'answer';
@@ -85,14 +105,61 @@ export type Intent = 'compose' | 'answer';
 /**
  * Whether a typed request is asking for a board or asking a question.
  *
- * Deliberately conservative: anything it is not sure about is a question, and
- * questions are what the copilot already does well.
+ * Takes the parsed request so the entities are read once rather than twice —
+ * `readRequest` below is the single entry point both halves go through.
  */
-export function detectIntent(question: string): Intent {
-  const q = question.toLowerCase();
-  const noun = BOARD_NOUNS.some((n) => q.includes(n));
-  const verb = MAKE_VERBS.some((v) => q.includes(v));
-  return noun && verb ? 'compose' : 'answer';
+export function detectIntent(question: string, parsed: ParsedRequest): Intent {
+  const q = question.trim().toLowerCase();
+  if (!q) return 'answer';
+
+  /* The first WORD, not `includes`: "who" sits inside "whose" and inside
+     plenty of ordinary sentences. */
+  const firstWord = q.split(/[^a-z]+/).filter(Boolean)[0] ?? '';
+
+  /*
+   * It names the thing outright — and then the question form does NOT veto it.
+   *
+   * ⚠️ "Can you show me a dashboard view?" is a question in shape and a request
+   * in intent, and reading it as an enquiry produced "I do not have an answer
+   * for that one" for somebody politely asking for exactly what this flow
+   * builds. Politeness is not a different intent.
+   *
+   * The interrogatives that DO mean a question about boards are the selecting
+   * ones — "which dashboard shows my fees", "what dashboard has turnaround".
+   * Those ask the copilot to pick from what exists rather than to make
+   * something, so they fall through to the answer router.
+   */
+  if (BOARD_NOUNS.some((n) => q.includes(n))) {
+    return SELECTING_OPENERS.includes(firstWord) ? 'answer' : 'compose';
+  }
+
+  /* No board noun: an ordinary question is an ordinary question. */
+  if (q.includes('?') || QUESTION_OPENERS.includes(firstWord)) return 'answer';
+
+  /*
+   * A bare scope — an organisation, or a period — with no question around it.
+   *
+   * "Northgate Bank", "quarterly review", "Meridian last quarter". These are
+   * noun phrases describing WHAT a board would cover, and someone types them
+   * when they want the board. A single theme word on its own ("fees") is not
+   * enough and deliberately falls through: that reads as a topic to ask about
+   * rather than a scope to build on.
+   */
+  const namesSomething = Object.keys(parsed.filters).length > 0;
+  const namesPeriod = PERIOD_WORDS.some((p) => p.words.some((w) => q.includes(w)));
+  return namesSomething || namesPeriod ? 'compose' : 'answer';
+}
+
+/**
+ * Read a request once: what it means, and what it is about.
+ *
+ * ⚠️ One entry point because `parse` walks every dimension's values over all
+ * 11,314 rows, and doing that twice per keystroke-ending — once to decide the
+ * intent and again to compose — is work for nothing.
+ */
+export function readRequest(question: string): { intent: Intent; parsed: ParsedRequest } {
+  const parsed = parse(question);
+  return { intent: detectIntent(question, parsed), parsed };
 }
 
 /* ============================================================================
@@ -652,8 +719,8 @@ export interface Composition {
   candidates: Candidate[];
 }
 
-export function compose(question: string): Composition {
-  const parsed = parse(question);
+export function compose(question: string, pre?: ParsedRequest): Composition {
+  const parsed = pre ?? parse(question);
   return { parsed, candidates: propose(parsed) };
 }
 

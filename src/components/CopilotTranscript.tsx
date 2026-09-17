@@ -229,6 +229,32 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
       {turns.map((turn, i) => {
         const last = i === turns.length - 1;
 
+        /* ---- nothing matched ----
+           An honest miss, with the things it CAN do offered underneath. The
+           suggestions are not decoration here: they are the answer to the
+           question the reader now has, which is "well, what can you do?" */
+        if (turn.kind === 'unmatched') {
+          return (
+            <div key={turn.id} className="flex flex-col gap-7">
+              <ChatMessage role="user">{turn.question}</ChatMessage>
+              <ChatMessage role="assistant">
+                <p className="text-md text-ink-2">
+                  I do not have an answer for that one. I can answer questions about orders,
+                  fees, turnaround and clients — or build you a dashboard if you name what it
+                  should cover.
+                </p>
+                <div className="mt-4">
+                  <ChatSuggestions
+                    label="Try one of these"
+                    items={[...OPENING_QUESTIONS, 'Northgate Bank quarterly review']}
+                    onPick={ask}
+                  />
+                </div>
+              </ChatMessage>
+            </div>
+          );
+        }
+
         /* ---- a proposal ---- */
         if (turn.kind === 'proposal') {
           return (

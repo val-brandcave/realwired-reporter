@@ -419,7 +419,26 @@ export const OPENING_QUESTIONS = [THREADS[0].prompt, THREADS[2].prompt, THREADS[
  * Scoring is longest-keyword-first so a specific phrase ("no category") beats
  * an incidental word ("category") that half the answers mention.
  */
-export function route(question: string): CopilotThread {
+export interface Routed {
+  thread: CopilotThread;
+  /**
+   * Whether anything actually matched.
+   *
+   * ⚠️ This is the important half, and it did not exist until 17 Sept. `best`
+   * was seeded with `THREADS[0]` and returned unconditionally, so a question
+   * with no matching keyword came back with the August fee answer — confidently,
+   * with a real widget under it, and with nothing anywhere saying "I did not
+   * understand that". Typing anything unrecognised produced the same screen
+   * every time, which is exactly what it looked like from the outside: a
+   * copilot that always does the same thing.
+   *
+   * A scripted assistant is allowed to know five things. It is not allowed to
+   * answer a sixth question as though it were one of the five.
+   */
+  matched: boolean;
+}
+
+export function route(question: string): Routed {
   const q = question.toLowerCase();
 
   let best = THREADS[0];
@@ -438,5 +457,5 @@ export function route(question: string): CopilotThread {
     }
   }
 
-  return best;
+  return { thread: best, matched: bestScore > 0 };
 }
