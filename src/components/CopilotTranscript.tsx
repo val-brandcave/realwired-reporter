@@ -156,8 +156,10 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
    * point is that you stay on the board you were looking at.
    *
    * The acknowledgements are the ones that do not move anybody: the card
-   * settles in place, and the rail's count ticks up. `Open it` is the only
-   * thing that changes the route, and the reader presses it.
+   * settles in place, the rail's count ticks up, and a toast says what
+   * happened. `Open it` is the only thing that changes the route, and the
+   * reader presses it — from the card or from the toast, both of which offer
+   * it under that exact name.
    */
   const createBoard = useCallback((turn: ProposalTurn) => {
     const name = turn.name.trim();
@@ -182,8 +184,33 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
       setPlacements(boardId, packBoard(chosen));
 
       settleProposal(turn.id, 'created', { id: boardId, name, widgets: chosen.length });
+
+      /*
+       * And say so.
+       *
+       * ⚠️ Re-added after being cut with the auto-navigation, which was the
+       * wrong thing to cut with it. `App.tsx` states the rule this provider
+       * exists for: the copilot's offers "each do something invisible — a
+       * report written to the library, a tile placed on a board you are not
+       * looking at — and an action with no acknowledgement reads as a dead
+       * button." Creating a board writes five reports to the library and a row
+       * to the rail, which is exactly that.
+       *
+       * It fires AFTER the build, not when the button was pressed: a toast
+       * announcing a finished board while the card is still building it would
+       * be the two of them disagreeing about what has happened.
+       *
+       * `Open it` here and `Open it` on the card, deliberately the same words
+       * for the same act — an action keeps its name through a whole flow.
+       */
+      toast({
+        tone: 'success',
+        title: `${name} created`,
+        description: `${chosen.length} widget${chosen.length === 1 ? '' : 's'} added, and saved to your reports.`,
+        action: { label: 'Open it', onClick: () => navigate(`/dashboards/${boardId}`) },
+      });
     }, BUILD_MS);
-  }, []);
+  }, [toast, navigate]);
 
   return (
     <>
