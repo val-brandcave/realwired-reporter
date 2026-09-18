@@ -165,3 +165,156 @@ body {
 .rw-slot-min {
   min-height: 36px;
 }
+
+/* ============================================================================
+   The copilot dock — the open/close, expressed as a WIDTH the layout can see.
+
+   ⭐ This is the whole difference between the drawer this used to be and the
+   dock it is now. A `Sheet` is `position: fixed`: it costs the layout nothing,
+   so the board underneath keeps its full width and the panel lands ON TOP of
+   the thing the reader is asking about. A copilot whose answers are about the
+   screen behind it cannot cover that screen.
+
+   So the panel is an ordinary flex child of `AppShell`'s content row and the
+   content REFLOWS around it — the dashboard grid re-lays out, a chart re-scales
+   to its new cell, a table sheds a column. That reflow is the feature. It is
+   also what the library's own `Flank` says in prose and what the sibling
+   prototype does; this app was the one place that disagreed with both.
+
+   ⚠️ Animating `width` rather than `transform: translateX`, and that is the
+   point rather than an oversight. A transform slides a panel over the page and
+   changes no other box on screen — which is the overlay we are leaving. Width
+   is the only property that makes the neighbour give up room. It costs layout
+   on each frame of a 320ms transition; measured on the five shipped boards that
+   is the grid re-flowing, which it already does on a window resize.
+
+   ⚠️ And `visibility`, stepped rather than eased. At width 0 the panel is
+   clipped but its buttons and its composer are still in the tab order, so a
+   keyboard reader would tab into a copilot they cannot see. `visibility:
+   hidden` takes them out of it. The delay is what keeps the CLOSING animation
+   visible: going out, visibility flips only after the width has finished;
+   coming in, it flips immediately.
+   ========================================================================== */
+.rw-dock-clip {
+  /* Containing block for the panel, which is positioned rather than flowed. */
+  position: relative;
+  flex: none;
+  min-height: 0;
+  width: 0;
+  /*
+   * `clip`, not `hidden`. `overflow: hidden` would make this a scroll container
+   * that merely hides its scrollbars — a box that can be scrolled by a stray
+   * focus or a `scrollIntoView` from inside the panel, with no way to scroll it
+   * back. `overflow: clip` is not scrollable at all, which is what is actually
+   * wanted: this box hides the panel, it does not offer to show more of it.
+   *
+   * ⚠️ It is not what stops the panel reaching the document — see the note on
+   * `.rw-dock-panel` below, which is the part that was measured.
+   */
+  overflow: clip;
+  /*
+   * ⚠️ At width 0 the panel is invisible but its buttons and its composer are
+   * still in the tab order, so a keyboard reader would tab into a copilot they
+   * cannot see. `visibility: hidden` takes them out of it, and unlike
+   * unmounting it keeps a half-typed question alive across a close.
+   *
+   * Stepped, not eased, and the delay is what keeps the CLOSING animation
+   * visible: going out, visibility flips only once the width has finished;
+   * coming in, it flips immediately.
+   */
+  visibility: hidden;
+  transition:
+    width var(--rw-dur-slow) var(--rw-ease-standard),
+    visibility 0s linear var(--rw-dur-slow);
+}
+
+/*
+ * 480px, and the number is MEASURED from BOTH sides — which is the thing a
+ * docked panel makes true and an overlay did not. A `Sheet` cost the board
+ * nothing, so its width was a question about the panel alone. This width is
+ * taken OUT of the board, so it is a question about the board too, and it was
+ * settled by measuring each screen at each candidate.
+ *
+ * The panel's side: an answer widget renders at 416 here, and the five
+ * scripted answers sweep clean at that width — no clipped box, no truncated
+ * label. (The recorded 436 floor comes from a two-up Insights card carrying
+ * the SLA target chart, a different and harder shape; it is the right number
+ * to start from and the wrong one to inherit without re-measuring.)
+ *
+ * The board's side, at a 1920 viewport with the rail collapsed: 480 leaves
+ * 1289 of grid and a 310px figure tile, which is the width at which
+ * `Average turnaround` — the longest title on Overview, needing 143 — fits
+ * its header beside the demo chip and the overflow menu. At 520 that tile is
+ * 300 and the title renders as `Average tur…`. 40px is the difference between
+ * a hero row that reads and one that does not, and the panel does not need
+ * them.
+ *
+ * ⚠️ So this number is load-bearing in two directions. Moving it means
+ * re-running both sweeps, not one.
+ */
+.rw-dock-clip[data-open='true'] {
+  width: 480px;
+  visibility: visible;
+  transition:
+    width var(--rw-dur-slow) var(--rw-ease-standard),
+    visibility 0s linear 0s;
+}
+
+/*
+ * Below `md` the panel takes the whole width and the board waits behind it.
+ * `Flank` already does this (`max-md:!w-full`) and the clip would cancel it by
+ * holding the panel at 480 — so the clip has to agree. On a phone the
+ * assistant IS the screen while you are talking to it; a 480px dock beside a
+ * 290px board is two unusable columns instead of one usable one.
+ */
+@media (max-width: 767px) {
+  .rw-dock-clip[data-open='true'] {
+    width: 100%;
+  }
+}
+
+/*
+ * ⚠️ The panel holds its full 480 throughout, and the CLIP is what grows.
+ *
+ * Animate the panel's own width instead and every box inside it is re-laid on
+ * every frame — the composer re-wraps, a chart re-measures twenty times, and a
+ * widget that is correct at 480 is drawn at 40, then 120, then 300 on the way
+ * there. Revealing a full-width panel through a clip lays its contents out
+ * once, at the width they will be read at. The sibling prototype arrives at
+ * the same place from the other side, pinning a `min-width` on each child of a
+ * panel whose own width is animating; this is the same trick with the
+ * bookkeeping in one place instead of four.
+ *
+ * ⚠️⚠️ And it is taken OUT OF FLOW, pinned to the clip's trailing edge. That
+ * is a fix, not a flourish, and neither `overflow: hidden` nor `overflow: clip`
+ * was enough on its own: left in flow, a 480px panel inside a zero-width clip
+ * still reached the document. MEASURED with the copilot SHUT —
+ * `documentElement.scrollWidth` 1933 against a 1920 viewport, the page
+ * genuinely scrolling 13px sideways, and a 15px horizontal scrollbar along the
+ * bottom of every screen in the app (`innerHeight` 889 against
+ * `clientHeight` 874). Nothing looked broken; there was simply a bar that had
+ * not been there the day before. Out of flow the panel has no in-flow box to
+ * overflow from, and the same three measurements read 1920 / 0 / 0.
+ *
+ * Pinning it to the END edge is also what makes the reveal read correctly: the
+ * panel is uncovered from the right as the clip widens, rather than sliding in
+ * from the left across itself.
+ */
+.rw-dock-panel {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rw-dock-clip,
+  .rw-dock-clip[data-open='true'] {
+    transition: none;
+  }
+}
+
+/* The transcript's gutter. `Flank` ships none, because a flank holding a nav
+   list wants its rows to bleed to the edge; a flank holding prose does not. */
+.rw-dock-body {
+  padding: 20px 24px 28px;
+}

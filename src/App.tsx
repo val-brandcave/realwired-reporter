@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import {
   AppShell,
-  Button,
   PageBody,
   PageHeader,
   ToastProvider,
@@ -25,8 +24,8 @@ import { Brandmark } from './components/Brandmark';
 // be back before this is shown to the client. See components/DemoBanner.tsx.
 // import { DemoBanner } from './components/DemoBanner';
 import { RouterLink } from './components/RouterLink';
-import { CopilotDrawer } from './components/CopilotDrawer';
-import { toggleDrawer } from './lib/thread';
+import { CopilotDrawer, CopilotToggle } from './components/CopilotDrawer';
+import { useDrawerOpen } from './lib/thread';
 
 /**
  * A page that does not exist yet. It says what is coming and what it will do,
@@ -124,8 +123,10 @@ export function App() {
    *
    * ⛔ Not on `/reports/*`. That route is chromeless on purpose — the builder
    * needs the width and escapes the shell deliberately — so there is no header
-   * to summon from, and a 560px panel would take more than a third of a
-   * three-column workbench that already yields to one column at 1280.
+   * to summon from, and a 480px panel would take more than a third of a
+   * three-column workbench that already yields to one column at 1280. That was
+   * the argument when the panel merely COVERED the workbench; now that it
+   * takes the width from it, it is stronger rather than weaker.
    *
    * ⛔ Not on `/chat`, because that page IS the copilot. A drawer showing the
    * same conversation over the page showing the same conversation is two
@@ -141,6 +142,64 @@ export function App() {
     else root.setAttribute('data-theme', theme);
   }, [theme]);
 
+  /* ==========================================================================
+     The rail gives way to the dock.
+
+     ⭐ Because the panel now takes its 480px OUT of the board rather than lying
+     on top of it, and the board notices. MEASURED at a 1920 viewport with the
+     rail OPEN: the four figures across the top of Overview go from 392px wide
+     to 262, and at 262 a tile header cannot hold its title beside the demo chip
+     and the overflow menu — `Completed orders` renders as `Completed …`,
+     `Average turnaround` as `Average tur…`. Three of the four lose the words
+     that say what the number IS, which is the one part of a stat tile that
+     cannot be inferred by looking at it.
+
+     Collapsing the rail hands 152px back and takes those tiles to 310, where
+     every title on the board fits — swept, none truncated. It is also the
+     honest trade: while you are talking to the copilot, the thing you need on
+     screen is the board, not the list of other boards. Every product with a
+     right-hand panel makes this trade, and the sibling prototype ships with its
+     rail collapsed by default for the same reason.
+
+     ⚠️ It is a SUGGESTION, not a lock. The collapse toggle stays live, so
+     re-opening the rail while the copilot is docked works and sticks — and
+     because it sticks, closing the copilot then leaves it open rather than
+     collapsing it a second time behind the reader's back.
+
+     ⛔ ONE MEASURED DEFECT REMAINS AND IT IS NOT FIXED HERE. With the dock
+     open, Overview's donut tile (`Fee by request category`) is clipped: 433px
+     of content in 294px of body, found by the standard sweep and NOT by
+     looking. It is whole with the dock shut, so this exposed it rather than
+     caused it — the donut moves its value list under the ring below some board
+     width and then needs a taller tile than `widgetSize('donut').def` declares.
+     The same class of defect as the `table` def on 15 Sept and the `stat` def
+     on 17 Sept: a default is a declaration, and this one is wrong at a width
+     the board had never been asked for. Fixing it means either a library `def`
+     or a board relayout, and both change a screen that has already been
+     reviewed — so it is written down rather than taken unilaterally.
+     ========================================================================== */
+  /* ⚠️ `showCopilot` too, not just `drawerOpen`. The dock is not rendered on
+     `/chat` or in the builder, and a rail collapsed to make room for a panel
+     that is not on the screen is the app tidying itself for no reason. */
+  const dockShowing = useDrawerOpen() && showCopilot;
+  const [collapsed, setCollapsed] = useState(false);
+  /* What the rail was before the dock asked for the room. A ref, not state:
+     nothing renders from it, and reading it inside the effect must not make
+     the effect depend on it. */
+  const railBeforeDock = useRef(false);
+
+  useEffect(() => {
+    if (dockShowing) {
+      setCollapsed((was) => {
+        railBeforeDock.current = was;
+        return true;
+      });
+      return;
+    }
+    /* Only restore if the reader has not overruled us in the meantime. */
+    setCollapsed((was) => (was ? railBeforeDock.current : was));
+  }, [dockShowing]);
+
   return (
     /* One provider for the whole app. The copilot's three offers each do
        something invisible — a report written to the library, a tile placed on
@@ -150,9 +209,26 @@ export function App() {
       <AppShell
         nav={nav}
         currentPath={pathname}
+        collapsed={collapsed}
+        onCollapsedChange={setCollapsed}
         chromeless={chromeless}
         linkComponent={RouterLink}
         brand={(collapsed) => <Brandmark collapsed={collapsed} />}
+        /*
+          The copilot goes in the shell's `dock` slot, which is the seam the
+          library built for a trailing panel and the reason the panel PUSHES
+          the page instead of covering it.
+
+          ⭐ Still mounted OUTSIDE the routes, which was the point of hoisting
+          the turns into `lib/thread.ts` and is unchanged by the move. Rendered
+          inside a route it would unmount on every navigation — so asking a
+          question on Overview and clicking through to Transactions to watch
+          the answer land would close the panel mid-sentence, which is the
+          exact move a docked copilot exists to allow.
+
+          It draws a zero-width clip until it is opened. See `CopilotDrawer`.
+        */
+        dock={showCopilot ? <CopilotDrawer /> : undefined}
         header={{
           texture: false,
           /*
@@ -179,11 +255,7 @@ export function App() {
                 is an account — the trailing-most slot is where a user menu is
                 looked for.
               */}
-              {showCopilot && (
-                <Button variant="ghost" size="sm" iconLeft="comment" onClick={toggleDrawer}>
-                  Copilot
-                </Button>
-              )}
+              {showCopilot && <CopilotToggle />}
               <UserMenu
               name="Brenda Wilson"
               email="brenda@realwired.com"
@@ -246,19 +318,6 @@ export function App() {
             }
           />
         </Routes>
-
-        {/*
-          The drawer is mounted OUTSIDE the routes, beside them.
-
-          ⭐ Deliberate, and it is the other half of hoisting the turns into
-          `lib/thread.ts`. Rendered inside a route it would unmount on every
-          navigation — so asking a question on Overview and clicking through to
-          Transactions to watch the answer land would close the panel mid-
-          sentence, which is the exact move a non-modal drawer exists to allow.
-
-          It draws nothing until it is opened; `Sheet` portals its content.
-        */}
-        {showCopilot && <CopilotDrawer />}
       </AppShell>
     </ToastProvider>
   );

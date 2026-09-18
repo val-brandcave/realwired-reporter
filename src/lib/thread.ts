@@ -140,6 +140,22 @@ export function useThread(): ThreadState {
   return useSyncExternalStore(subscribe, getState, getState);
 }
 
+/**
+ * Whether the dock is showing, and NOTHING else.
+ *
+ * ⚠️ Narrow on purpose. `App` has to know this — it gives the rail up to the
+ * panel — but `useThread` hands back the whole state, so `App` would then
+ * re-render on every keystroke in a proposal's name field and every tick of a
+ * checkbox, taking the router and the whole dashboard grid with it.
+ *
+ * `useSyncExternalStore` compares snapshots with `Object.is`, so a snapshot of
+ * one boolean re-renders only when that boolean flips.
+ */
+const getDrawerOpen = () => state.drawerOpen;
+export function useDrawerOpen(): boolean {
+  return useSyncExternalStore(subscribe, getDrawerOpen, getDrawerOpen);
+}
+
 const set = (patch: Partial<ThreadState>) => {
   state = { ...state, ...patch };
   emit();
