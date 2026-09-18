@@ -107,10 +107,20 @@ export function ProposalCard({
   if (settled) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-md text-ink-2">
-          {turn.status === 'building' ? 'Making' : 'Made'}{' '}
-          <strong>{turn.board?.name ?? named}</strong> — {kept.length} widget
-          {kept.length === 1 ? '' : 's'}.
+        {/* ⭐ The board's own glyph, beside its name. The same mark that is now
+            in the rail, so the thing the copilot just made is recognisable as
+            the row that appeared — which is the beat this card exists for.
+            Only once it EXISTS: while building there is no board to have a
+            glyph yet. */}
+        <p className="flex items-center gap-2 text-md text-ink-2">
+          {turn.board?.icon && (
+            <Icon name={turn.board.icon} size={17} strokeWidth={2} className="text-ink" aria-hidden />
+          )}
+          <span>
+            {turn.status === 'building' ? 'Making' : 'Made'}{' '}
+            <strong>{turn.board?.name ?? named}</strong> — {kept.length} report
+            {kept.length === 1 ? '' : 's'}.
+          </span>
         </p>
 
         {/* What went on it. Read-only, and kept in the transcript on purpose:

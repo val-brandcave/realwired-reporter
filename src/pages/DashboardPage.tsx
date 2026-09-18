@@ -11,6 +11,7 @@ import {
   PageHeader,
   TileMenu,
   useToast,
+  type IconName,
   type TilePlacement,
   type WidgetTypeId,
 } from '@realwired/ui';
@@ -242,8 +243,8 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
    * does not, which is why only creation lands in edit.
    */
   const confirmDuplicate = useCallback(
-    (name: string) => {
-      const newId = duplicateDashboard(id, name, placements);
+    (name: string, icon: IconName) => {
+      const newId = duplicateDashboard(id, name, placements, icon);
       setNaming(null);
       navigate(`/dashboards/${newId}`);
     },
@@ -251,8 +252,8 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
   );
 
   const confirmRename = useCallback(
-    (name: string) => {
-      renameDashboard(id, name);
+    (name: string, icon: IconName) => {
+      renameDashboard(id, name, icon);
       setNaming(null);
       /* No toast. The title in front of you changes and the rail row changes
          with it — an acknowledgement of something you can already see is
@@ -421,8 +422,8 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
           open
           title="New dashboard"
           confirmLabel="Create dashboard"
-          onConfirm={(name) => {
-            const newId = createDashboard(name);
+          onConfirm={(name, icon) => {
+            const newId = createDashboard(name, icon);
             navigate(`/dashboards/${newId}`, {
               replace: true,
               state: { editing: true, adding: true },
@@ -473,7 +474,11 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
           header says "Dashboards"; this says which one, and lets you change
           it. See `BoardSwitcher` for why the rail is not enough on its own.
         */
-        title={<BoardSwitcher current={{ id: dashboard.id, name: dashboard.name }} />}
+        title={
+          <BoardSwitcher
+            current={{ id: dashboard.id, name: dashboard.name, icon: dashboard.icon }}
+          />
+        }
         /*
           Edit mode used to be said by rewriting the title to "Editing
           Overview". It cannot be now — the title is a control, and a control
@@ -680,6 +685,11 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
         title={naming === 'rename' ? 'Rename dashboard' : 'Duplicate dashboard'}
         confirmLabel={naming === 'rename' ? 'Save name' : 'Duplicate board'}
         initialName={naming === 'rename' ? dashboard.name : `${dashboard.name} (copy)`}
+        /* ⭐ Seeded from the board in BOTH jobs, which is what makes a copy
+           keep its source's glyph without `duplicateDashboard` needing a rule
+           about inheritance — the dialog opens on it, and the reader either
+           accepts it or changes it like anything else in the form. */
+        initialIcon={dashboard.icon}
         onConfirm={naming === 'rename' ? confirmRename : confirmDuplicate}
         onCancel={() => setNaming(null)}
       />

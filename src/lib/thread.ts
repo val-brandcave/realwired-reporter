@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { IconName } from '@realwired/ui';
 
 import { attachedFilters, attachedReportIds, type Attachment } from './attach';
 import { compose, readRequest, scope, type Composition } from './compose';
@@ -97,7 +98,7 @@ export interface ProposalTurn {
    */
   status: 'open' | 'building' | 'created' | 'dismissed';
   /** Set once created, so the settled card can link to what it made. */
-  board?: { id: string; name: string; widgets: number };
+  board?: { id: string; name: string; widgets: number; icon: IconName };
 }
 
 /**
@@ -438,7 +439,7 @@ export function toggleCandidate(turnId: string, reportId: string): void {
 export function settleProposal(
   turnId: string,
   status: 'created' | 'dismissed',
-  board?: { id: string; name: string; widgets: number }
+  board?: { id: string; name: string; widgets: number; icon: IconName }
 ): void {
   set({
     turns: state.turns.map((t) =>

@@ -46,9 +46,14 @@ export function buildNav(dashboards: Dashboard[]): NavNode[] {
        */
       badge: dashboards.length,
       children: [
+        /* ⭐ Each board's own glyph, 18 Sept — the client's ask. Five rows of
+           text are read; five glyphs are recognised. `SidebarNav` drops the
+           child indent for a row that has an icon, so these land on the same
+           column as the section above them rather than opening a second one. */
         ...dashboards.map((d) => ({
           id: d.id,
           label: d.name,
+          icon: d.icon,
           href: `/dashboards/${d.id}`,
         })),
         /*
@@ -73,14 +78,19 @@ export function buildNav(dashboards: Dashboard[]): NavNode[] {
     {
       id: 'chat',
       /*
-       * ⭐ "Copilot", not "Chat" — 18 Sept, and it is the same one-word-per-
-       * thing rule that retired "widget". The summon control in the header
-       * said Copilot, the docked panel's own band said Copilot, and only the
-       * rail said Chat, so the product had two names for one destination and
-       * the odd one out was here. The ROUTE stays `/chat`, the way the code
-       * still says `board` where the screen says dashboard.
+       * ⭐ "AI Chat" — Val, 18 Sept, replacing "Copilot".
+       *
+       * ⚠️ And it deliberately does NOT match the section title above it, which
+       * reads "AI Assistant". That is not the inconsistency the one-word rule
+       * was aimed at: this row is a DESTINATION — a place with a conversation
+       * list in it — and the assistant is the THING you talk to there. The
+       * header's button summons the thing ("Ask AI Assistant"); the rail
+       * navigates to the place. Two names because there are two objects.
+       *
+       * The ROUTE stays `/chat`, the way the code still says `board` where the
+       * screen says dashboard.
        */
-      label: 'Copilot',
+      label: 'AI Chat',
       icon: 'comment',
       href: '/chat',
     },
@@ -100,7 +110,23 @@ export function buildNav(dashboards: Dashboard[]): NavNode[] {
  * saying Chat in the header with nothing to catch it.
  */
 export function sectionTitle(pathname: string): string {
+  const override = TITLE_OVERRIDES.find(([href]) => pathname.startsWith(href));
+  if (override) return override[1];
+
   const nodes = buildNav([]);
   const match = nodes.find((n) => n.href && n.href !== '/' && pathname.startsWith(n.href));
   return match?.label ?? 'Reporter';
 }
+
+/**
+ * Where the header's name is not the rail's.
+ *
+ * ⚠️ One entry, and it earns an exception rather than breaking the rule. Every
+ * other screen's header name IS its rail label, derived so the two cannot
+ * drift. `/chat` is the one place where the rail names a destination ("AI
+ * Chat") and the header names what is on it ("AI Assistant") — see the note on
+ * that node. A list kept here rather than a second label field on `NavNode`,
+ * because this is an app decision about two screens and not a shape the
+ * library's nav model should grow for one product.
+ */
+const TITLE_OVERRIDES: Array<[href: string, title: string]> = [['/chat', 'AI Assistant']];

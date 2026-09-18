@@ -89,24 +89,35 @@ const DOCK_W = 480;
  * so that `App` does not have to. Read `drawerOpen` up there and the whole
  * router re-renders every time a turn lands.
  *
- * It reports its own state, which a dock needs and a modal drawer did not. A
- * `Sheet` announces itself by dimming the world; a panel that is simply part of
- * the layout does not, so the control that opened it has to say that it is on.
- * `outline` over `ghost` is that difference — the same button, sitting up.
+ * ⭐ PRIMARY, with the sparkle, reading "Ask AI Assistant" — Val, 18 Sept.
+ *
+ * It was a quiet ghost button that said "Copilot", which made the one genuinely
+ * new thing in this product the most easily missed control in the chrome. The
+ * header carries a rail toggle, a page name and an avatar; the assistant is the
+ * only thing there anyone would want to be invited to use.
+ *
+ * ⚠️ It stays primary when the panel is OPEN rather than switching to outline
+ * to show state. A 480px panel that has just pushed the board across is not a
+ * state anyone can miss, so the button does not need to carry it visually —
+ * but `aria-pressed` still says so, because a screen-reader user has no panel
+ * to look at. The one thing this costs is that the label reads as an
+ * invitation while the invitation is already accepted; a second label would be
+ * a control whose words change under you, which is the trade this project
+ * already made once on the dashboard title.
  */
 export function CopilotToggle() {
   const { drawerOpen } = useThread();
 
   return (
     <Button
-      variant={drawerOpen ? 'outline' : 'ghost'}
+      variant="primary"
       size="sm"
-      iconLeft="comment"
+      iconLeft="ai"
       aria-pressed={drawerOpen}
       aria-controls="rw-copilot-dock"
       onClick={toggleDrawer}
     >
-      Copilot
+      Ask AI Assistant
     </Button>
   );
 }
@@ -157,7 +168,7 @@ export function CopilotDrawer() {
     >
       <Flank
         side="end"
-        label="Copilot"
+        label="AI Assistant"
         width={`${DOCK_W}px`}
         className="rw-dock-panel"
         contentClassName="rw-dock-body"
@@ -182,9 +193,12 @@ export function CopilotDrawer() {
                 color: 'var(--rw-primary-contrast)',
               }}
             >
-              <Icon name="comment" size={15} />
+              {/* The sparkle, matching the control that summons it — the
+                  button in the header and the band at the top of what it opens
+                  are the same object arriving. */}
+              <Icon name="ai" size={15} />
             </span>
-            <span className="font-semibold text-ink">Copilot</span>
+            <span className="font-semibold text-ink">AI Assistant</span>
             <span className="flex-1" />
             {/* The way out to the full page, where the conversation rail lives. */}
             <Button

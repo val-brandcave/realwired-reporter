@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Dialog, Input } from '@realwired/ui';
+import { Button, Dialog, Icon, Input, type IconName } from '@realwired/ui';
+
+import { BOARD_ICONS, suggestIcon } from '../lib/boardIcons';
 
 export interface DashboardNameDialogProps {
   open: boolean;
@@ -9,7 +11,15 @@ export interface DashboardNameDialogProps {
   confirmLabel: string;
   /** The name the field starts with: empty for new, the copy's name, the current name. */
   initialName?: string;
-  onConfirm: (name: string) => void;
+  /**
+   * The icon the grid opens on.
+   *
+   * Omitted for a NEW board, where the suggestion follows what is typed. Passed
+   * for a duplicate or a rename, where the board already has one and the
+   * dialog's job is to show it, not to guess again.
+   */
+  initialIcon?: IconName;
+  onConfirm: (name: string, icon: IconName) => void;
   onCancel: () => void;
 }
 
@@ -49,10 +59,23 @@ export function DashboardNameDialog({
   title,
   confirmLabel,
   initialName = '',
+  initialIcon,
   onConfirm,
   onCancel,
 }: DashboardNameDialogProps) {
   const [name, setName] = useState(initialName);
+  /*
+   * ⭐ `null` means "nobody has chosen", which is NOT the same as "the default
+   * glyph", and the difference is the whole behaviour.
+   *
+   * While it is null the grid follows what is being typed — type "Q3 fee
+   * review" and the money glyph lights up as you go. The moment a glyph is
+   * clicked this holds it, and typing stops moving it. A single `icon` state
+   * seeded with the suggestion could not tell those apart: it would either
+   * overwrite a deliberate choice on the next keystroke, or freeze on whatever
+   * the first letter happened to suggest.
+   */
+  const [picked, setPicked] = useState<IconName | null>(initialIcon ?? null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   /*
@@ -66,13 +89,17 @@ export function DashboardNameDialog({
   useEffect(() => {
     if (!open) return;
     setName(initialName);
+    setPicked(initialIcon ?? null);
     const t = window.setTimeout(() => inputRef.current?.select(), 0);
     return () => window.clearTimeout(t);
-  }, [open, initialName]);
+  }, [open, initialName, initialIcon]);
 
   const trimmed = name.trim();
+  /* What the grid shows as selected: the deliberate choice, or the live guess. */
+  const icon: IconName = picked ?? suggestIcon(name);
+
   const submit = () => {
-    if (trimmed) onConfirm(trimmed);
+    if (trimmed) onConfirm(trimmed, icon);
   };
 
   return (
@@ -109,15 +136,87 @@ export function DashboardNameDialog({
         <label htmlFor="rw-dash-name" className="mb-2 block text-base font-medium text-ink">
           Name
         </label>
-        <Input
-          id="rw-dash-name"
-          ref={inputRef}
-          value={name}
-          placeholder="Northgate QBR"
-          autoComplete="off"
-          maxLength={60}
-          onChange={(e) => setName(e.target.value)}
-        />
+        {/*
+          The name and the chosen glyph, on one line.
+
+          ⭐ The icon sits INSIDE the field's row rather than above the grid,
+          because it is the same object the name is — this is the board, being
+          named. A preview floating somewhere else in the dialog would be a
+          third thing to look at, and the reader would have to work out which
+          of the twenty-four glyphs below it corresponded to.
+        */}
+        <div className="flex items-center gap-2.5">
+          <span className="rw-icon-preview" aria-hidden>
+            <Icon name={icon} size={20} strokeWidth={2} />
+          </span>
+          <Input
+            id="rw-dash-name"
+            ref={inputRef}
+            value={name}
+            placeholder="Northgate QBR"
+            autoComplete="off"
+            maxLength={60}
+            onChange={(e) => setName(e.target.value)}
+            className="flex-1"
+          />
+        </div>
+
+        {/*
+          The grid.
+
+          ⚠️ A `radiogroup`, not a row of buttons. Picking an icon is choosing
+          ONE of a set, which is what a radio group is, and it is what gives
+          the arrow keys their meaning for free — a grid of twenty-four
+          buttons would make the reader press Tab twenty-four times to reach
+          the last one.
+        */}
+        <fieldset className="rw-icon-field">
+          <legend className="rw-icon-legend">Icon</legend>
+          <div className="rw-icon-grid" role="radiogroup" aria-label="Icon">
+            {BOARD_ICONS.map((name_) => {
+              const selected = name_ === icon;
+              return (
+                <button
+                  key={name_}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  aria-label={name_}
+                  data-selected={selected}
+                  /* Only the selected cell is a tab stop, so the grid is ONE
+                     stop in the dialog's tab order and the arrows move within
+                     it — the standard radio-group model. */
+                  tabIndex={selected ? 0 : -1}
+                  onClick={() => setPicked(name_)}
+                  onKeyDown={(e) => {
+                    const step =
+                      e.key === 'ArrowRight' || e.key === 'ArrowDown'
+                        ? 1
+                        : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+                          ? -1
+                          : 0;
+                    if (!step) return;
+                    e.preventDefault();
+                    const i = BOARD_ICONS.indexOf(icon);
+                    const next = BOARD_ICONS[(i + step + BOARD_ICONS.length) % BOARD_ICONS.length];
+                    setPicked(next);
+                  }}
+                >
+                  <Icon name={name_} size={19} strokeWidth={2} />
+                </button>
+              );
+            })}
+          </div>
+          {/*
+            ⭐ Said out loud while it is still a guess. A grid that quietly
+            moves its own selection as you type is the app doing something you
+            did not ask for — the complaint from 17 Sept — unless it tells you
+            that is what is happening and that you can overrule it.
+          */}
+          {picked === null && trimmed !== '' && (
+            <p className="rw-icon-hint">Suggested from the name. Pick any to change it.</p>
+          )}
+        </fieldset>
       </form>
     </Dialog>
   );

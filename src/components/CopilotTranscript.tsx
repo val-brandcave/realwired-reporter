@@ -17,7 +17,7 @@ import { bindingDateBasis } from '../lib/binding';
 import { addToDashboard, setPlacements } from '../lib/boards';
 import { applyPeriod } from '../lib/context';
 import { OPENING_QUESTIONS } from '../lib/copilot';
-import { createDashboard } from '../lib/dashboards';
+import { createDashboard, findDashboard } from '../lib/dashboards';
 import { saveReport } from '../lib/library';
 import { packBoard } from '../lib/pack';
 import {
@@ -183,7 +183,15 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
       const boardId = createDashboard(name);
       setPlacements(boardId, packBoard(chosen));
 
-      settleProposal(turn.id, 'created', { id: boardId, name, widgets: chosen.length });
+      /* The glyph the board was actually given, read back off the store rather
+         than guessed a second time here — `createDashboard` owns that call, and
+         two places guessing would eventually disagree. */
+      settleProposal(turn.id, 'created', {
+        id: boardId,
+        name,
+        widgets: chosen.length,
+        icon: findDashboard(boardId)?.icon ?? 'dashboard',
+      });
 
       /*
        * And say so.

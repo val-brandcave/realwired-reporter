@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ActionMenu, Icon } from '@realwired/ui';
+import { ActionMenu, Icon, type IconName } from '@realwired/ui';
 
 import { useDashboards } from '../lib/dashboards';
 
@@ -23,7 +23,7 @@ import { useDashboards } from '../lib/dashboards';
 
 export interface BoardSwitcherProps {
   /** The board being shown. */
-  current: { id: string; name: string };
+  current: { id: string; name: string; icon: IconName };
 }
 
 export function BoardSwitcher({ current }: BoardSwitcherProps) {
@@ -37,11 +37,14 @@ export function BoardSwitcher({ current }: BoardSwitcherProps) {
         ...dashboards.map((d) => ({
           id: d.id,
           label: d.name,
-          /* A check on the one you are on, a dashboard glyph on the rest.
-             One icon column either way, so the labels stay on one edge —
-             marking the current row by omitting its icon would ripple the
-             whole list. */
-          icon: (d.id === current.id ? 'check' : 'dashboard') as 'check' | 'dashboard',
+          /* Each board's OWN glyph, so the menu and the rail agree — except
+             the one you are on, which takes a check.
+
+             ⚠️ The check REPLACES its glyph rather than sitting beside it: one
+             icon column keeps every label on one edge, and the board you are
+             on is already named in the trigger two pixels above, with its own
+             icon. Nothing is lost and the list stays a list. */
+          icon: (d.id === current.id ? 'check' : d.icon) as IconName,
           onSelect: () => navigate(`/dashboards/${d.id}`),
         })),
         {
@@ -61,6 +64,7 @@ export function BoardSwitcher({ current }: BoardSwitcherProps) {
          * only thing the control adds.
          */
         <button type="button" className="rw-board-switcher">
+          <Icon name={current.icon} size={20} strokeWidth={2} aria-hidden />
           {current.name}
           <Icon name="chevron-down" size={18} aria-hidden />
           <span className="sr-only">Change dashboard</span>

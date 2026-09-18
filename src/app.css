@@ -518,3 +518,93 @@ body {
   color: var(--rw-ink);
   white-space: nowrap;
 }
+
+/* ============================================================================
+   The dashboard icon picker.
+
+   ⚠️ Real classes, not utilities — TRAPS §1, this app has no Tailwind build
+   and `grid-cols-8` is one of the named casualties in that section: no rule is
+   emitted, `display:grid` applies alone, and twenty-four cells come out in one
+   column. Every value here comes from a token.
+   ========================================================================== */
+
+/* The chosen glyph, on the name field's own line. Sized to the Input beside it
+   (40px) so the two sit on one baseline rather than nearly on one. */
+.rw-icon-preview {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--rw-border);
+  border-radius: var(--rw-radius-md);
+  background: var(--rw-surface-1);
+  color: var(--rw-ink);
+}
+
+.rw-icon-field {
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+}
+.rw-icon-legend {
+  padding: 0 0 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--rw-ink);
+}
+
+/*
+ * Eight across, three rows. MEASURED against the dialog rather than chosen:
+ * the Dialog's content box is ~440px, and eight 44px cells with 6px gaps come
+ * to 394 — which leaves the grid sitting inside the field above it rather than
+ * straining against the dialog's own padding. Six across would run to four
+ * rows and make the modal taller than the board it is naming.
+ */
+.rw-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+
+.rw-icon-grid button {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 1px solid transparent;
+  border-radius: var(--rw-radius-sm);
+  background: transparent;
+  color: var(--rw-ink-2);
+  cursor: pointer;
+  transition:
+    background-color var(--rw-dur-fast) var(--rw-ease-standard),
+    color var(--rw-dur-fast) var(--rw-ease-standard),
+    border-color var(--rw-dur-fast) var(--rw-ease-standard);
+}
+.rw-icon-grid button:hover {
+  background: var(--rw-surface-1);
+  color: var(--rw-ink);
+}
+/*
+ * ⭐ The selected cell reads by FILL and BORDER, not by colour alone.
+ *
+ * The glyphs are monochrome by decision, so "this one is chosen" cannot be
+ * carried by hue — and a 3:1 fill difference is the only thing that survives
+ * both themes. `--rw-selected` is the same token the rail's active row uses,
+ * so being chosen looks the same everywhere in the product.
+ */
+.rw-icon-grid button[data-selected='true'] {
+  background: var(--rw-selected);
+  border-color: var(--rw-primary);
+  color: var(--rw-selected-ink);
+}
+.rw-icon-grid button:focus-visible {
+  outline: none;
+  box-shadow: var(--rw-ring);
+}
+
+.rw-icon-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--rw-ink-3);
+}

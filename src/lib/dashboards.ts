@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
 
-import type { TilePlacement } from '@realwired/ui';
+import type { IconName, TilePlacement } from '@realwired/ui';
+
+import { suggestIcon } from './boardIcons';
 
 /* ============================================================================
    Dashboards.
@@ -19,6 +21,19 @@ import type { TilePlacement } from '@realwired/ui';
 export interface Dashboard {
   id: string;
   name: string;
+  /**
+   * The glyph that stands for this board.
+   *
+   * ⭐ The client's ask, 18 Sept: five rows of text in the rail are read, not
+   * recognised. The icon appears everywhere the board is named — the rail, the
+   * band's switcher and its menu, the toasts the copilot raises — so a board
+   * is the same object wherever you meet it.
+   *
+   * Required, not optional. An optional icon means every surface has to decide
+   * what to draw when there isn't one, and they will decide differently;
+   * `suggestIcon()` guarantees there is always a real answer.
+   */
+  icon: IconName;
   /**
    * One line about the board, for anyone reading this file.
    *
@@ -86,6 +101,11 @@ export const DASHBOARDS: Dashboard[] = [
   {
     id: 'overview',
     name: 'Overview',
+    /* ⛔ NOT `dashboard`, which is the section's own glyph in the rail — the
+       child sat directly under its parent wearing the identical mark, so the
+       row that is one board read as the row that is all of them. A board's
+       icon has to say which board. */
+    icon: 'columns',
     blurb: 'Volume, revenue and turnaround across the whole book.',
     /* The whole book, so the whole common set plus the client's own tier. */
     filters: [...COMMON_FILTERS, 'segment'],
@@ -140,6 +160,7 @@ export const DASHBOARDS: Dashboard[] = [
   {
     id: 'transactions',
     name: 'Transactions',
+    icon: 'credit-card',
     blurb: 'What was billed, to whom, and how it splits.',
     /* Billing, so `orderType` earns its place: a rush order bills
        differently, and this is the only board where that is the question. */
@@ -167,6 +188,7 @@ export const DASHBOARDS: Dashboard[] = [
   {
     id: 'ledger',
     name: 'Realwired Ledger',
+    icon: 'book',
     blurb: "Realwired's own revenue, by source and over time.",
     /* Realwired's own P&L. No `segment` — the client's tier is a fact about
        the client, and this board is not asking about the client. */
@@ -184,6 +206,7 @@ export const DASHBOARDS: Dashboard[] = [
   {
     id: 'portfolio',
     name: 'Client Portfolio',
+    icon: 'org',
     blurb: 'Who is growing, who is trailing off, and who to call.',
     /* A board about clients: tier matters, and the category mix is how you
        tell a growing account from a busy one. */
@@ -198,6 +221,7 @@ export const DASHBOARDS: Dashboard[] = [
   {
     id: 'reviews',
     name: 'AI Reviews',
+    icon: 'reviews',
     blurb: 'Review volume, mix and how long they take.',
     /* `reviewType` exists for exactly this board, and is offered nowhere
        else — which is the case that per-board sets were asked for. */
@@ -301,11 +325,22 @@ function idFor(name: string): string {
  * board asks, and no opinion about the answers. A board someone made to answer
  * their own question should not arrive pre-narrowed to ours.
  */
-export function createDashboard(name: string): string {
+export function createDashboard(name: string, icon?: IconName): string {
   const id = idFor(name);
   userBoards = [
     ...userBoards,
-    { id, name: name.trim(), blurb: 'Made in this session.', filters: COMMON_FILTERS, scope: {}, tiles: [] },
+    {
+      id,
+      name: name.trim(),
+      /* The copilot creates without a dialog, so the guess has to live here as
+         well as in the modal — otherwise a composed board is the one board in
+         the app with no icon. */
+      icon: icon ?? suggestIcon(name),
+      blurb: 'Made in this session.',
+      filters: COMMON_FILTERS,
+      scope: {},
+      tiles: [],
+    },
   ];
   rebuild();
   return id;
@@ -324,7 +359,12 @@ export function createDashboard(name: string): string {
  * duplicate means "back to the copy as I made it", which is the only reading
  * of reset that is useful on a board that was never shipped.
  */
-export function duplicateDashboard(sourceId: string, name: string, tiles: TilePlacement[]): string {
+export function duplicateDashboard(
+  sourceId: string,
+  name: string,
+  tiles: TilePlacement[],
+  icon?: IconName
+): string {
   const source = findDashboard(sourceId);
   const id = idFor(name);
   userBoards = [
@@ -332,6 +372,10 @@ export function duplicateDashboard(sourceId: string, name: string, tiles: TilePl
     {
       id,
       name: name.trim(),
+      /* ⚠️ The DIALOG's icon wins, and it opens seeded from the source. So a
+         copy keeps its source's glyph unless the reader changes it, without
+         this function having to hold a rule of its own about inheritance. */
+      icon: icon ?? source?.icon ?? suggestIcon(name),
       blurb: `Copied from ${source?.name ?? 'another board'} in this session.`,
       filters: source?.filters ?? COMMON_FILTERS,
       scope: { ...(source?.scope ?? {}) },
@@ -342,8 +386,17 @@ export function duplicateDashboard(sourceId: string, name: string, tiles: TilePl
   return id;
 }
 
-export function renameDashboard(id: string, name: string): void {
-  userBoards = userBoards.map((d) => (d.id === id ? { ...d, name: name.trim() } : d));
+/**
+ * Rename a board, and re-icon it.
+ *
+ * One function because it is one dialog: `Rename dashboard` shows the name and
+ * the icon together, and a reader who opens it to change the glyph should not
+ * have to find a second place to do it.
+ */
+export function renameDashboard(id: string, name: string, icon?: IconName): void {
+  userBoards = userBoards.map((d) =>
+    d.id === id ? { ...d, name: name.trim(), ...(icon ? { icon } : {}) } : d
+  );
   rebuild();
 }
 
