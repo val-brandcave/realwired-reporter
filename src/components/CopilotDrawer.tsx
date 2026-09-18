@@ -1,10 +1,11 @@
-import { type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Flank, Icon, IconButton } from '@realwired/ui';
+import { Button, ChatThreadRail, Flank, Icon, IconButton, Tooltip } from '@realwired/ui';
 
 import { CopilotComposer } from './CopilotComposer';
 import { CopilotTranscript } from './CopilotTranscript';
-import { setDrawerOpen, toggleDrawer, useThread } from '../lib/thread';
+import { THREADS } from '../lib/copilot';
+import { openThread, setDrawerOpen, startNew, toggleDrawer, useThread } from '../lib/thread';
 
 /* ============================================================================
    The copilot, docked BESIDE the thing you are changing — and taking room from
@@ -124,7 +125,36 @@ export function CopilotToggle() {
 
 export function CopilotDrawer() {
   const navigate = useNavigate();
-  const { drawerOpen } = useThread();
+  const { drawerOpen, activeThreadId } = useThread();
+  /*
+   * Past conversations, over the dock rather than beside it.
+   *
+   * ⭐ This REVERSES what this file argued until 18 Sept — that a second thread
+   * list in a 480px panel was a worse copy of `/chat`. That was right about a
+   * list that lives there permanently and wrong about the need: picking up
+   * yesterday's question about the board in front of you was the one thing the
+   * dock could not do, and "go to the full page for history" sends you away
+   * from the board the history is about.
+   *
+   * A slide-over resolves both. It costs the dock nothing at rest — the panel
+   * is its full width the moment a thread is picked — so the board never pays
+   * for a list used once a minute. The sibling prototype reached the same
+   * answer, and this is that, in our shell's grammar.
+   */
+  const [threadsOpen, setThreadsOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const railThreads = useMemo(
+    () => THREADS.map(({ id, title, meta, group }) => ({ id, title, meta, group })),
+    []
+  );
+
+  /* Closing the dock closes the slide-over with it. Re-opening the dock onto a
+     thread list the reader left up ten minutes ago would hide the conversation
+     they came back for. */
+  useEffect(() => {
+    if (!drawerOpen) setThreadsOpen(false);
+  }, [drawerOpen]);
 
   /*
    * Escape closes it, but only from INSIDE.
@@ -140,6 +170,16 @@ export function CopilotDrawer() {
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'Escape' || !drawerOpen) return;
     e.stopPropagation();
+    /*
+     * ⚠️ One layer at a time. With the conversations slide-over up, Escape
+     * closes THAT and leaves the assistant open — dismissing both would take
+     * away the panel the reader was mid-way through using, and they would have
+     * to summon it again to get back to the conversation they were already in.
+     */
+    if (threadsOpen) {
+      setThreadsOpen(false);
+      return;
+    }
     setDrawerOpen(false);
   };
 
@@ -178,45 +218,63 @@ export function CopilotDrawer() {
            * `Sheet`'s two-line eyebrow-over-title had to become one line. No
            * loss: "Ask about your book" was a restatement of the composer's own
            * placeholder sitting two inches above it.
+           *
+           * ⭐ The controls are ICONS with tooltips, not words. Four actions in
+           * 480px minus a title cannot each carry a label — `Open in chat` alone
+           * was 96px — and these are the four every assistant puts here, so the
+           * glyphs are ones readers arrive already knowing. The tooltip is what
+           * makes that safe rather than a guess.
            */
           <>
-            <span
-              aria-hidden
-              style={{
-                display: 'grid',
-                placeItems: 'center',
-                width: 26,
-                height: 26,
-                flex: 'none',
-                borderRadius: 'var(--rw-radius-xs)',
-                background: 'var(--rw-primary)',
-                color: 'var(--rw-primary-contrast)',
-              }}
-            >
-              {/* The sparkle, matching the control that summons it — the
-                  button in the header and the band at the top of what it opens
-                  are the same object arriving. */}
+            <Tooltip content="Conversations" side="bottom">
+              <IconButton
+                icon="menu"
+                label="Conversations"
+                size="sm"
+                aria-expanded={threadsOpen}
+                onClick={() => setThreadsOpen(true)}
+              />
+            </Tooltip>
+            <span className="rw-dock-mark" aria-hidden>
+              {/* The sparkle, matching the control that summons it — the button
+                  in the header and the band at the top of what it opens are the
+                  same object arriving. */}
               <Icon name="ai" size={15} />
             </span>
             <span className="font-semibold text-ink">AI Assistant</span>
             <span className="flex-1" />
-            {/* The way out to the full page, where the conversation rail lives. */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setDrawerOpen(false);
-                navigate('/chat');
-              }}
-            >
-              Open in chat
-            </Button>
-            <IconButton
-              icon="close"
-              label="Close the copilot"
-              size="sm"
-              onClick={() => setDrawerOpen(false)}
-            />
+            <Tooltip content="New chat" side="bottom">
+              <IconButton
+                icon="edit"
+                label="New chat"
+                size="sm"
+                onClick={() => {
+                  startNew();
+                  setThreadsOpen(false);
+                }}
+              />
+            </Tooltip>
+            {/* The way out to the full page, where the conversation rail is a
+                permanent surface rather than something you slide over. */}
+            <Tooltip content="Open full page" side="bottom">
+              <IconButton
+                icon="expand"
+                label="Open full page"
+                size="sm"
+                onClick={() => {
+                  setDrawerOpen(false);
+                  navigate('/chat');
+                }}
+              />
+            </Tooltip>
+            <Tooltip content="Close" side="bottom">
+              <IconButton
+                icon="close"
+                label="Close the assistant"
+                size="sm"
+                onClick={() => setDrawerOpen(false)}
+              />
+            </Tooltip>
           </>
         }
         footer={
@@ -236,6 +294,70 @@ export function CopilotDrawer() {
         <div className="flex flex-col gap-7">
           <CopilotTranscript widgetHeight={ANSWER_H} />
         </div>
+
+        {/* ============================================================
+            The conversations slide-over.
+
+            ⚠️ It is a sibling of the transcript INSIDE the flank, absolutely
+            positioned over the whole panel — header, body and composer. It has
+            to cover the composer: a thread list with a live "Ask…" field
+            underneath it offers two things at once and the reader cannot tell
+            which one Enter belongs to.
+
+            ⚠️ Rendered only while open rather than kept mounted and hidden.
+            Unlike the dock itself there is no draft to preserve here, and a
+            mounted list would keep a stale search string and a scroll position
+            from a visit the reader has forgotten.
+            ============================================================ */}
+        {threadsOpen && (
+          <>
+            {/* The strip of transcript still showing at the trailing edge is
+                what says this is OVER the conversation rather than instead of
+                it. Clicking it is the way back. */}
+            <button
+              type="button"
+              className="rw-threads-scrim"
+              aria-label="Close conversations"
+              onClick={() => setThreadsOpen(false)}
+            />
+            <div className="rw-threads-over" role="dialog" aria-label="Conversations">
+              <div className="rw-threads-head">
+                <span className="rw-dock-mark" aria-hidden>
+                  <Icon name="ai" size={15} />
+                </span>
+                <span className="font-semibold text-ink">Conversations</span>
+                <span className="flex-1" />
+                <Tooltip content="Hide" side="bottom">
+                  <IconButton
+                    icon="panel-close"
+                    label="Hide conversations"
+                    size="sm"
+                    onClick={() => setThreadsOpen(false)}
+                  />
+                </Tooltip>
+              </div>
+              <div className="rw-threads-body">
+                <ChatThreadRail
+                  threads={railThreads}
+                  activeId={activeThreadId}
+                  /* Picking one closes the panel: the reader asked to see that
+                     conversation, and leaving the list up over it would mean
+                     they had to dismiss the thing they just chose. */
+                  onSelect={(id) => {
+                    openThread(id);
+                    setThreadsOpen(false);
+                  }}
+                  onNew={() => {
+                    startNew();
+                    setThreadsOpen(false);
+                  }}
+                  query={query}
+                  onQueryChange={setQuery}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </Flank>
     </div>
   );

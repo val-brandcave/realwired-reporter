@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChatThreadRail, Flank, PageBody, PageHeader } from '@realwired/ui';
+import { ChatThreadRail, Flank, IconButton, PageBody, PageHeader, Tooltip } from '@realwired/ui';
 
 import { CopilotComposer } from '../components/CopilotComposer';
 import { CopilotTranscript } from '../components/CopilotTranscript';
@@ -63,6 +63,20 @@ const ANSWER_H = 360;
 export function ChatPage() {
   const { activeThreadId } = useThread();
   const [query, setQuery] = useState('');
+  /*
+   * The flank collapses, like everything else on this screen that can be got
+   * out of the way.
+   *
+   * ⭐ To a 56px icon rail rather than to nothing. The two things anyone does
+   * from this panel — start a conversation, find one — stay one click away,
+   * and the control that brings it back is where it went. Collapsing to zero
+   * would put the way back somewhere else, which is the difference between
+   * folding a panel and hiding it.
+   *
+   * Local state: this is a reading preference for one screen, not something
+   * another surface needs to know.
+   */
+  const [railCollapsed, setRailCollapsed] = useState(false);
 
   /* The saved conversation the band names. `undefined` until one is opened,
      which is exactly when the band should say the conversation is new. */
@@ -84,19 +98,83 @@ export function ChatPage() {
       with the composer floating in the middle of dead space.
     */
     <div className="flex h-full min-h-0">
-      {/* Leading flank: navigation, read before the content. The drawer
-          deliberately does not carry this — past conversations are what this
-          page is FOR, and a second thread list in a 560px panel would be a
-          worse copy of the screen you are already one click from. */}
-      <Flank side="start" label="Conversations">
-        <ChatThreadRail
-          threads={railThreads}
-          activeId={activeThreadId}
-          onSelect={openThread}
-          onNew={startNew}
-          query={query}
-          onQueryChange={setQuery}
-        />
+      {/*
+        Leading flank: navigation, read before the content.
+
+        ⚠️ The comment that used to sit here said the drawer deliberately does
+        NOT carry a thread list. It does now — as a slide-over, not a second
+        rail. See `CopilotDrawer`, which records why that reversed.
+      */}
+      <Flank
+        side="start"
+        label="Conversations"
+        width={railCollapsed ? '56px' : undefined}
+        header={
+          /*
+           * "Conversations", naming what the flank HOLDS.
+           *
+           * ⛔ Not the assistant's name, which the app header already says
+           * twelve pixels above this band — the sibling prototype puts its
+           * identity here, and copying that would stack the same two words
+           * twice in one corner. The flank was the one thing on this screen
+           * with no label at all; now it has the only one it needed.
+           */
+          railCollapsed ? (
+            <Tooltip content="Show conversations" side="right">
+              <IconButton
+                icon="panel-open"
+                label="Show conversations"
+                size="sm"
+                onClick={() => setRailCollapsed(false)}
+              />
+            </Tooltip>
+          ) : (
+            <>
+              <span className="min-w-0 flex-1 truncate font-semibold text-ink">Conversations</span>
+              <Tooltip content="Hide" side="bottom">
+                <IconButton
+                  icon="panel-close"
+                  label="Hide conversations"
+                  size="sm"
+                  onClick={() => setRailCollapsed(true)}
+                />
+              </Tooltip>
+            </>
+          )
+        }
+      >
+        {railCollapsed ? (
+          /*
+           * The folded rail. Two actions, not the list — a list at 56px is a
+           * column of truncated first letters, which is worse than no list.
+           *
+           * ⭐ Search RE-OPENS the flank rather than doing anything at 56px.
+           * There is nowhere to type and nowhere to show a result, so the
+           * honest behaviour is to unfold the panel that has both.
+           */
+          <div className="rw-flank-folded">
+            <Tooltip content="New chat" side="right">
+              <IconButton icon="edit" label="New chat" size="md" onClick={startNew} />
+            </Tooltip>
+            <Tooltip content="Search chats" side="right">
+              <IconButton
+                icon="search"
+                label="Search chats"
+                size="md"
+                onClick={() => setRailCollapsed(false)}
+              />
+            </Tooltip>
+          </div>
+        ) : (
+          <ChatThreadRail
+            threads={railThreads}
+            activeId={activeThreadId}
+            onSelect={openThread}
+            onNew={startNew}
+            query={query}
+            onQueryChange={setQuery}
+          />
+        )}
       </Flank>
 
       <div className="flex min-w-0 flex-1 flex-col">

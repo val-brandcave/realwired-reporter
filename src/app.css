@@ -608,3 +608,110 @@ body {
   font-size: 12px;
   color: var(--rw-ink-3);
 }
+
+/* ============================================================================
+   The dock's brand mark, and its conversations slide-over.
+   ========================================================================== */
+
+/* The sparkle tile, in both the dock's header and the slide-over's — the same
+   mark in both says the panel that slid over is still the assistant. */
+.rw-dock-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--rw-radius-xs);
+  background: var(--rw-primary);
+  color: var(--rw-primary-contrast);
+}
+
+/*
+ * The strip of conversation left showing at the trailing edge.
+ *
+ * ⭐ 40px, and it is the whole reason this reads as a slide-over rather than a
+ * different screen: something of the thing underneath stays visible, so the
+ * panel is obviously ON the assistant and obviously dismissible. A full-width
+ * cover would be a second page that happens to have arrived without a
+ * navigation.
+ *
+ * It is a `button`, not a div with a click handler — it dismisses, so it is
+ * reachable by keyboard and announced as what it does.
+ */
+.rw-threads-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  border: 0;
+  padding: 0;
+  background: color-mix(in srgb, var(--rw-ink) 22%, transparent);
+  cursor: pointer;
+}
+
+.rw-threads-over {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  /* The dock is 480; 40 of transcript stays visible behind it. */
+  width: calc(100% - 40px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--rw-surface);
+  border-inline-end: 1px solid var(--rw-border-subtle);
+  box-shadow: var(--rw-shadow-lg, 0 12px 32px rgb(0 0 0 / 0.14));
+}
+
+/* Its own 60px band, on the same gridline as the dock's header behind it —
+   the panel slides across, and the two headers must not appear to jump. */
+.rw-threads-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: var(--rw-header-h);
+  padding: 0 8px 0 16px;
+  border-block-end: 1px solid var(--rw-border-subtle);
+}
+
+.rw-threads-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rw-threads-over {
+    animation: rw-threads-in var(--rw-dur-base) var(--rw-ease-out);
+  }
+  .rw-threads-scrim {
+    animation: rw-fade-in var(--rw-dur-base) var(--rw-ease-out);
+  }
+}
+@keyframes rw-threads-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes rw-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The chat flank, folded to its icon rail. Centred on the 56px column so the
+   two controls sit under the expand toggle in the header above them. */
+.rw-flank-folded {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+}
