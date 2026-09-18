@@ -596,7 +596,7 @@ function score(report: Report, themes: string[]): number {
  * the library the moment the board saved, and every other board drawing it
  * would silently become Northgate-only.
  */
-function scope(report: Report, parsed: ParsedRequest): Report {
+export function scope(report: Report, parsed: ParsedRequest): Report {
   const hasFilters = Object.keys(parsed.filters).length > 0;
   if (!hasFilters) return { ...report, id: `${report.id}-ai`, origin: 'ai', tags: [...report.tags, 'composed'] };
 

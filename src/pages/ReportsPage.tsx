@@ -90,11 +90,15 @@ export function ReportsPage() {
 
   return (
     <>
+      {/*
+        ⛔ No title, and no description either.
+
+        The title moved to the app header on 18 Sept, where every screen names
+        itself. What is left of this band is its other job — the one action
+        this page offers. The description was cut long before that, on the same
+        reasoning: the cards below say what they are.
+      */}
       <PageHeader
-        title="Reports"
-        /* No description. Val's call, 10 Sept — the cards below say what they
-           are, and a line under the title restating the page's own name is a
-           row the eye learns to skip. */
         actions={
           <Button size="control" iconLeft="add" onClick={() => navigate('/reports/new')}>
             New report

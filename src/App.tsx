@@ -16,7 +16,7 @@ import { InsightsPage } from './pages/InsightsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { EMPTY_FILTERS, type Filters } from './lib/context';
 import { useDashboards } from './lib/dashboards';
-import { buildNav } from './nav';
+import { buildNav, sectionTitle } from './nav';
 import { Brandmark } from './components/Brandmark';
 // Val's call, 10 Sept: the demo-data banner is OFF for now. The component is
 // still there and this is a two-line restore — uncomment the import and the
@@ -231,6 +231,17 @@ export function App() {
         dock={showCopilot ? <CopilotDrawer /> : undefined}
         header={{
           texture: false,
+          /*
+            ⭐ Every screen names itself here — Val's ask, 18 Sept, following
+            the sibling prototype, where the top bar carries the section and
+            the band below carries the object.
+
+            It sits immediately after the rail toggle, which is `AppHeader`'s
+            `leading` slot, so the name of the place lands next to the control
+            that widens it. `start` is documented as "usually breadcrumbs or a
+            page title"; this is the page title, and the seam already existed.
+          */
+          start: <span className="rw-section-title">{sectionTitle(pathname)}</span>,
           /*
            * The trailing edge is where `AppHeader` documents the user menu
            * belongs, and the approved `Reports` artboard draws an avatar there.

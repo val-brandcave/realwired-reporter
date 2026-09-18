@@ -5,6 +5,7 @@ import {
   AlertDialog,
   Button,
   Callout,
+  Chip,
   DashboardGrid,
   PageBody,
   PageHeader,
@@ -15,6 +16,7 @@ import {
 } from '@realwired/ui';
 
 import { AddReportRail } from '../components/AddReportRail';
+import { BoardSwitcher } from '../components/BoardSwitcher';
 import { DashboardNameDialog } from '../components/DashboardNameDialog';
 import { useDashboardFilters } from '../components/DashboardFilters';
 import { ReportWidget } from '../components/ReportWidget';
@@ -466,7 +468,24 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
         `Transactions` does not need a line saying it is about transactions.
       */}
       <PageHeader
-        title={editing ? `Editing ${dashboard.name}` : dashboard.name}
+        /*
+          ⭐ The board's name is now a SWITCHER, not a label — 18 Sept. The app
+          header says "Dashboards"; this says which one, and lets you change
+          it. See `BoardSwitcher` for why the rail is not enough on its own.
+        */
+        title={<BoardSwitcher current={{ id: dashboard.id, name: dashboard.name }} />}
+        /*
+          Edit mode used to be said by rewriting the title to "Editing
+          Overview". It cannot be now — the title is a control, and a control
+          whose label changes under you is a different control. A badge beside
+          it says the same thing without touching the name, and it sits where
+          `PageHeader` already puts state.
+        */
+        badges={
+          editing ? (
+            <Chip tone="warning">Editing</Chip>
+          ) : undefined
+        }
         actions={
           editing ? (
             <>
@@ -483,8 +502,13 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
                   Reset layout
                 </Button>
               )}
+              {/* "report", not "widget" — 18 Sept. They are the same object,
+                  and the app was calling it both: the library, the builder and
+                  every toast said report, and only this button and the empty
+                  state said widget. `widget` is what the code calls the thing;
+                  it is not what the reader calls it. */}
               <Button size="control" iconLeft="add" onClick={() => setAdding(true)}>
-                Add a widget
+                Add a report
               </Button>
               {/* The primary action LEAVES the mode. The way out of a mode is
                   the most important control in it. */}
@@ -518,12 +542,12 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
                 `Overview` out from under the demo helps nobody.
               */}
               <ActionMenu
-                label="Board actions"
+                label="Dashboard actions"
                 align="end"
                 items={[
                   {
                     id: 'duplicate',
-                    label: 'Duplicate board',
+                    label: 'Duplicate dashboard',
                     icon: 'copy',
                     onSelect: () => setNaming('duplicate'),
                   },
@@ -537,7 +561,7 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
                         },
                         {
                           id: 'delete',
-                          label: 'Delete board',
+                          label: 'Delete dashboard',
                           icon: 'trash' as const,
                           tone: 'danger' as const,
                           separatorBefore: true,
@@ -621,7 +645,7 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
                 editing
                   ? undefined
                   : () => {
-                      /* The button says "Add a widget", so it adds a widget —
+                      /* The button says "Add a report", so it adds a report —
                          entering edit mode is the app's business, not a step
                          the reader should have to take first. */
                       setEditing(true);
@@ -670,8 +694,8 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title={`Delete ${dashboard.name}?`}
-        description="The board and its arrangement go away. The reports on it stay in your library."
-        confirmLabel="Delete board"
+        description="The dashboard and its arrangement go away. The reports on it stay in your library."
+        confirmLabel="Delete dashboard"
         tone="danger"
         icon="trash"
         onConfirm={confirmDeleteBoard}
@@ -694,7 +718,7 @@ export function DashboardPage({ filters, onFiltersChange }: DashboardPageProps) 
  * the rail, not dragged into the board from outside, so an outline promising a
  * target that does not accept a drop is worse than no outline.
  *
- * `onAdd` is absent in edit mode, where `Add a widget` is already in the
+ * `onAdd` is absent in edit mode, where `Add a report` is already in the
  * header two inches above. One button, in one place, per screen.
  */
 function EmptyBoard({ onAdd }: { onAdd?: () => void }) {
@@ -706,7 +730,7 @@ function EmptyBoard({ onAdd }: { onAdd?: () => void }) {
       </p>
       {onAdd && (
         <Button className="mt-2" iconLeft="add" onClick={onAdd}>
-          Add a widget
+          Add a report
         </Button>
       )}
     </div>

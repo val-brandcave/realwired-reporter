@@ -217,7 +217,7 @@ export function CopilotTranscript({ widgetHeight }: CopilotTranscriptProps) {
       {turns.length === 0 && !pending && (
         <ChatOpener
           title="Ask about your book"
-          blurb="Orders, fees, turnaround, clients. Answers come back as a widget you can keep — or ask for a dashboard and pick what goes on it."
+          blurb="Orders, fees, turnaround, clients. Answers come back as a report you can keep — or ask for a dashboard and pick what goes on it."
         >
           <ChatSuggestions
             items={[...OPENING_QUESTIONS, 'Build me a dashboard for Northgate’s quarterly review']}

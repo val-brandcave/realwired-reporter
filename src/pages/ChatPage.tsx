@@ -1,15 +1,10 @@
 import { useMemo, useState } from 'react';
-import {
-  ChatComposer,
-  ChatThreadRail,
-  Flank,
-  PageBody,
-  PageHeader,
-} from '@realwired/ui';
+import { ChatThreadRail, Flank, PageBody, PageHeader } from '@realwired/ui';
 
+import { CopilotComposer } from '../components/CopilotComposer';
 import { CopilotTranscript } from '../components/CopilotTranscript';
 import { THREADS } from '../lib/copilot';
-import { ask, openThread, startNew, useThread } from '../lib/thread';
+import { openThread, startNew, useThread } from '../lib/thread';
 
 /* ============================================================================
    The reporting copilot — step 7. The DESTINATION surface.
@@ -66,19 +61,20 @@ const COLUMN = 820;
 const ANSWER_H = 360;
 
 export function ChatPage() {
-  const { activeThreadId, pending } = useThread();
-  const [draft, setDraft] = useState('');
+  const { activeThreadId } = useThread();
   const [query, setQuery] = useState('');
+
+  /* The saved conversation the band names. `undefined` until one is opened,
+     which is exactly when the band should say the conversation is new. */
+  const activeThread = useMemo(
+    () => THREADS.find((t) => t.id === activeThreadId),
+    [activeThreadId]
+  );
 
   const railThreads = useMemo(
     () => THREADS.map(({ id, title, meta, group }) => ({ id, title, meta, group })),
     []
   );
-
-  const send = () => {
-    ask(draft);
-    setDraft('');
-  };
 
   return (
     /*
@@ -104,7 +100,22 @@ export function ChatPage() {
       </Flank>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <PageHeader title="Reporting copilot" />
+        {/*
+          ⛔ No title, and ⛔ no `New chat` either.
+
+          The title moved to the app header on 18 Sept, where every screen now
+          names itself. `New chat` was put here in the same pass and taken out
+          again immediately: the rail two inches to the left already has one,
+          so the screen carried TWO controls with the same words. That is the
+          defect Val caught on 17 Sept, when a naming dialog put two `Create
+          dashboard` buttons on screen at once — one flow, one button.
+
+          What the band says instead is the same thing the dashboards band
+          says: WHICH one you are in. The app header names the section, this
+          names the object, and the rail — which collapses — is where you go to
+          change it.
+        */}
+        <PageHeader title={activeThread?.title ?? 'New conversation'} />
 
         {/* The transcript scrolls, not the page: the composer below is chrome
             and must not scroll away from the reader. */}
@@ -123,22 +134,24 @@ export function ChatPage() {
           </div>
         </PageBody>
 
-        {/* The composer is chrome, not content: it stays put while the
-            transcript scrolls behind it, so the way to ask is never something
-            you have to scroll to find. */}
-        <div className="border-t border-border-subtle bg-surface px-[var(--rw-page-x)] py-3">
+        {/*
+          ⭐ The composer FLOATS here rather than sitting in a band — Val's ask,
+          18 Sept, following the sibling prototype.
+
+          The band was correct while the composer was chrome: a hairline, a
+          surface fill, and the field inside it. But on this page the composer
+          is the point of the screen, not its furniture, and a rule across the
+          full width said the opposite — it drew a floor under the conversation
+          and put the field in the basement. Raised, on the canvas, it reads as
+          the thing you are about to use.
+
+          ⚠️ It still does not scroll. The transcript above it scrolls; this
+          stays put, which is the property the band was there to provide and
+          the one thing that had to survive losing it.
+        */}
+        <div className="px-[var(--rw-page-x)] pb-5 pt-2">
           <div className="mx-auto w-full" style={{ maxWidth: COLUMN }}>
-            <ChatComposer
-              value={draft}
-              onChange={setDraft}
-              onSubmit={send}
-              busy={Boolean(pending)}
-              /* Both copilot surfaces offer it, for the same reason one
-                 thread serves both: they are one assistant. See the note in
-                 `CopilotDrawer`. */
-              dictation
-              placeholder="Ask about your orders, fees or turnaround"
-            />
+            <CopilotComposer raised placeholder="Ask about your orders, fees or turnaround" />
           </div>
         </div>
       </div>

@@ -136,7 +136,7 @@ export function ProposalCard({
              other option and its own note rules it out — it is for waits over
              roughly ten seconds, and this is milliseconds of real work. A
              named sequence here would be inventing a wait. */
-          <ChatThinking label="Saving the widgets and arranging the board" />
+          <ChatThinking label="Saving the reports and arranging the dashboard" />
         ) : (
           <Callout
             tone="success"

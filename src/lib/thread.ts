@@ -1,7 +1,9 @@
 import { useSyncExternalStore } from 'react';
 
-import { compose, readRequest, type Composition } from './compose';
+import { attachedFilters, attachedReportIds, type Attachment } from './attach';
+import { compose, readRequest, scope, type Composition } from './compose';
 import { THREADS, route, type CopilotAnswer } from './copilot';
+import { getReports } from './library';
 
 /* ============================================================================
    The conversation, hoisted out of the page that used to draw it.
@@ -39,6 +41,16 @@ export interface AnswerTurn {
   question: string;
   answer: CopilotAnswer;
 }
+
+/**
+ * What a turn was carrying when it was asked.
+ *
+ * ⭐ Recorded ON the turn, not only in the composer, and that is the honest
+ * part. The chips change what comes back — a client narrows every figure in
+ * it — so a transcript that showed the answer without them would show a
+ * number whose scope had been erased. The turn states what it was asked with.
+ */
+export type TurnAttachments = Attachment[];
 
 /**
  * A turn the copilot answered with a PROPOSAL — widgets to pick from.
@@ -107,7 +119,7 @@ export interface UnmatchedTurn {
   question: string;
 }
 
-export type Turn = AnswerTurn | ProposalTurn | UnmatchedTurn;
+export type Turn = (AnswerTurn | ProposalTurn | UnmatchedTurn) & { attached?: TurnAttachments };
 
 interface ThreadState {
   turns: Turn[];
@@ -191,11 +203,31 @@ let seq = 0;
  * anything else routes to an answer. Both produce a turn; the transcript does
  * not care which kind, and neither does the surface drawing it.
  */
-export function ask(question: string): void {
+export function ask(question: string, attached: TurnAttachments = []): void {
   const q = question.trim();
-  if (!q) return;
+  /* ⭐ A chip is a question. Attaching `Total client fee` and pressing send with
+     an empty field is a complete request — "show me this" — and refusing it
+     would make the chips decoration that only works alongside typing. */
+  if (!q && attached.length === 0) return;
 
-  set({ pending: q });
+  /*
+   * ⚠️ What the reader's own bubble says.
+   *
+   * MEASURED defect, 18 Sept, found by sending a question that was only chips:
+   * the turn carried `question: ''` and the transcript drew a 20px EMPTY
+   * bubble above the answer. The chips ARE the question in that case, so they
+   * are what the bubble says — and it has to be the same string `pending`
+   * showed a beat earlier, or the user's words change under them the moment
+   * the answer lands.
+   *
+   * ⚠️ Only for DISPLAY. Everything that reads the request — `readRequest`,
+   * `route`, `compose` — still gets the typed text, because a chip label is a
+   * chosen value and feeding it back in as free text would put it through the
+   * same fuzzy name matching the chip exists to avoid.
+   */
+  const asked = q || attachedPrompt(attached);
+
+  set({ pending: asked });
   clear();
 
   timer = setTimeout(() => {
@@ -203,35 +235,129 @@ export function ask(question: string): void {
     /* One read of the request: what it means, and what it is about. */
     const { intent, parsed } = readRequest(q);
 
+    /*
+     * ⭐ The chips are merged into the PARSE, not bolted on after it.
+     *
+     * That is what makes them behave identically to naming the same thing in
+     * the sentence — the same `filters` map feeds the same `scope()`, the same
+     * `REALWIRED_MARGIN` rule and the same readback. A separate path would be
+     * a second way to say "for Northgate Bank" that could drift from the
+     * first, and the vendor-margin rule is one of the two things in this
+     * composer that must never be bypassed.
+     */
+    const chipFilters = attachedFilters(attached);
+    const scoped = {
+      ...parsed,
+      filters: { ...parsed.filters, ...chipFilters },
+    };
+    const pinned = attachedReportIds(attached);
+
     const turn: Turn =
-      intent === 'compose'
+      intent === 'compose' || (pinned.length > 0 && wantsBoard(q))
         ? (() => {
-            const composition = compose(q, parsed);
+            const composition = compose(q, scoped);
+            /* A pinned report is ticked whatever the scorer thought of it.
+               Asking for it explicitly outranks a ranking. */
+            const recommended = composition.candidates
+              .filter((c) => c.recommended)
+              .map((c) => c.report.id);
             return {
               kind: 'proposal' as const,
               id: `compose-${seq}`,
-              question: q,
+              question: asked,
+              attached,
               composition,
-              /* The composer's own recommendation is the opening state. The
-                 reader edits a proposal; they do not assemble one from
-                 nothing, which is what an all-unticked list would ask for. */
-              selected: composition.candidates.filter((c) => c.recommended).map((c) => c.report.id),
+              selected: [...new Set([...recommended, ...pinnedCandidateIds(composition, pinned)])],
               name: composition.parsed.suggestedName,
               status: 'open' as const,
             };
           })()
         : (() => {
+            /*
+             * ⭐ An attached report IS the answer.
+             *
+             * Deterministic and it cannot lie: the reader named the report, so
+             * the copilot shows that report — narrowed by any client chip,
+             * through the same `scope()` the composer uses, which is what drops
+             * a caption counting all 85 organizations off a one-bank figure.
+             *
+             * It also takes the place of "I do not have an answer for that
+             * one": with a report attached there is always something true to
+             * show, which is the whole point of attaching it.
+             */
+            const seed = pinned.length > 0 ? getReports().find((r) => r.id === pinned[0]) : undefined;
+            if (seed) {
+              return {
+                kind: 'answer' as const,
+                id: `attached-${seq}`,
+                question: asked,
+                attached,
+                answer: {
+                  prose: attachedProse(seed.title, attached),
+                  report: Object.keys(chipFilters).length ? scope(seed, scoped) : seed,
+                  range: scoped.range,
+                  followups: [],
+                },
+              };
+            }
+
             const { thread, matched } = route(q);
             /* ⛔ Nothing matched — say so rather than returning the nearest
                scripted answer. See `UnmatchedTurn`. */
-            if (!matched) return { kind: 'unmatched' as const, id: `miss-${seq}`, question: q };
+            if (!matched)
+              return { kind: 'unmatched' as const, id: `miss-${seq}`, question: asked, attached };
             set({ activeThreadId: thread.id });
-            return { kind: 'answer' as const, id: `${thread.id}-${seq}`, question: q, answer: thread.answer };
+            return {
+              kind: 'answer' as const,
+              id: `${thread.id}-${seq}`,
+              question: asked,
+              attached,
+              /* A client chip narrows a scripted answer's widget too. The
+                 words above it were written about the whole book, so they are
+                 left alone and the widget states its own scope in its footer —
+                 rewriting scripted prose from a filter is the kind of
+                 generated sentence that ends up false. */
+              answer: Object.keys(chipFilters).length
+                ? { ...thread.answer, report: scope(thread.answer.report, scoped) }
+                : thread.answer,
+            };
           })();
 
     set({ turns: [...state.turns, turn], pending: null });
     timer = null;
   }, THINKING_MS);
+}
+
+/** What the user's bubble says when they attached something and typed nothing. */
+const attachedPrompt = (attached: TurnAttachments): string =>
+  attached.map((a) => a.label).join(' · ');
+
+/**
+ * ⚠️ A board still needs asking for.
+ *
+ * Attaching a report does not mean "build me a board out of this" — most of
+ * the time it means "show me this". So a pinned report only routes to the
+ * composer when the sentence around it asks for one, and `readRequest` has
+ * already made that call for everything else.
+ */
+const BOARD_WORDS = ['dashboard', 'board', 'boards'];
+const wantsBoard = (q: string): boolean => {
+  const lower = q.toLowerCase();
+  return BOARD_WORDS.some((w) => lower.includes(w));
+};
+
+/** Pinned ids, mapped onto the candidate clones the composer actually made. */
+const pinnedCandidateIds = (composition: Composition, pinned: string[]): string[] =>
+  composition.candidates
+    .filter((c) => pinned.some((id) => c.report.id === id || c.report.id === `${id}-ai`))
+    .map((c) => c.report.id);
+
+/** One sentence for an attached-report answer. Says what it is and its scope. */
+function attachedProse(title: string, attached: TurnAttachments): string {
+  const clients = attached.filter((a) => a.kind === 'client').map((a) => a.label);
+  if (clients.length === 0) return `${title}, over the period below.`;
+  const who = clients.length === 1 ? clients[0] : `${clients.length} clients`;
+  return `${title}, narrowed to ${who}.`;
 }
 
 /**

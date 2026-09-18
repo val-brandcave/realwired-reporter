@@ -72,9 +72,35 @@ export function buildNav(dashboards: Dashboard[]): NavNode[] {
     },
     {
       id: 'chat',
-      label: 'Chat',
+      /*
+       * ⭐ "Copilot", not "Chat" — 18 Sept, and it is the same one-word-per-
+       * thing rule that retired "widget". The summon control in the header
+       * said Copilot, the docked panel's own band said Copilot, and only the
+       * rail said Chat, so the product had two names for one destination and
+       * the odd one out was here. The ROUTE stays `/chat`, the way the code
+       * still says `board` where the screen says dashboard.
+       */
+      label: 'Copilot',
       icon: 'comment',
       href: '/chat',
     },
   ];
+}
+
+/**
+ * What the app header calls the screen you are on.
+ *
+ * ⭐ The SECTION, never the object. "Dashboards" while you are on Overview,
+ * because the band underneath names the board and a top bar that repeated it
+ * would spend the app's most permanent line on a fact already on screen.
+ *
+ * ⚠️ Derived from `buildNav` rather than written out beside it. A second list
+ * of the same four names is a second list to forget: the rail was renamed from
+ * Chat to Copilot on 18 Sept, and a hand-written map here would have gone on
+ * saying Chat in the header with nothing to catch it.
+ */
+export function sectionTitle(pathname: string): string {
+  const nodes = buildNav([]);
+  const match = nodes.find((n) => n.href && n.href !== '/' && pathname.startsWith(n.href));
+  return match?.label ?? 'Reporter';
 }

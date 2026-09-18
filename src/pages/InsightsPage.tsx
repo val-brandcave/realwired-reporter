@@ -304,7 +304,9 @@ export function InsightsPage({ filters, onFiltersChange }: InsightsPageProps) {
         standing note from review: a surface should read as composed, not as
         elements that happen to be near each other.
       */}
-      <PageHeader title="Insights" actions={filterParts.button} toolbar={filterParts.summary} />
+      {/* No title — it is in the app header now (18 Sept). The band keeps what
+          it is for: the filter control, and the line stating what is applied. */}
+      <PageHeader actions={filterParts.button} toolbar={filterParts.summary} />
 
       <PageBody>
         <div

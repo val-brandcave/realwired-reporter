@@ -318,3 +318,203 @@ body {
 .rw-dock-body {
   padding: 20px 24px 28px;
 }
+
+/* ============================================================================
+   The composer's attach picker and its chips.
+
+   ⚠️ Real classes rather than utilities, and it is TRAPS §1 rather than taste:
+   this app has no Tailwind build, so `ps-8`, `max-h-72` and `rounded-pill`
+   would each compute to nothing and the panel would render as an unstyled
+   stack. Every value below comes from a token.
+   ========================================================================== */
+
+/* `Popover` pads itself for a panel of controls; this one is a list, and a
+   list's padding belongs to its rows. */
+.rw-attach-pop {
+  padding: 0;
+}
+
+.rw-attach-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-block-end: 1px solid var(--rw-border-subtle);
+  color: var(--rw-ink-3);
+}
+.rw-attach-search input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--rw-radius-sm);
+  background: var(--rw-surface-1);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--rw-ink);
+}
+.rw-attach-search input::placeholder {
+  color: var(--rw-ink-3);
+}
+.rw-attach-search input:focus {
+  outline: none;
+  border-color: var(--rw-accent);
+}
+
+/*
+ * The fold. ~7 rows, which is enough to show that BOTH groups exist without
+ * the panel becoming the screen — a picker taller than the conversation it is
+ * attached to reads as a page rather than a control.
+ */
+.rw-attach-list {
+  max-height: 288px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.rw-attach-group {
+  margin: 0;
+  padding: 8px 8px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--rw-ink-3);
+}
+
+.rw-attach-empty {
+  margin: 0;
+  padding: 12px 8px;
+  font-size: 14px;
+  color: var(--rw-ink-2);
+}
+
+.rw-attach-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--rw-radius-sm);
+  background: transparent;
+  text-align: start;
+  cursor: pointer;
+  color: var(--rw-ink-3);
+}
+/* ⚠️ Driven by `data-active`, not `:hover`. The arrow keys and the mouse have
+   to highlight the SAME row, or a reader who arrows down three rows and then
+   moves the mouse sees two highlights and Enter takes neither of the obvious
+   ones. The mouse sets `data-active` on enter; there is no `:hover` rule. */
+.rw-attach-row[data-active='true'] {
+  background: var(--rw-surface-1);
+}
+.rw-attach-text {
+  min-width: 0;
+  flex: 1;
+}
+.rw-attach-label,
+.rw-attach-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rw-attach-label {
+  font-size: 14px;
+  color: var(--rw-ink);
+}
+.rw-attach-meta {
+  font-size: 12px;
+  color: var(--rw-ink-3);
+}
+
+/* ---- the chips, inside the composer's own box ---- */
+
+.rw-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border-radius: var(--rw-radius-pill);
+  background: var(--rw-surface-1);
+  font-size: 12px;
+  color: var(--rw-ink-2);
+}
+.rw-attach-chip svg {
+  flex: none;
+  color: var(--rw-ink-3);
+}
+.rw-attach-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rw-attach-chip button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: var(--rw-radius-full);
+  background: transparent;
+  color: var(--rw-ink-3);
+  cursor: pointer;
+}
+.rw-attach-chip button:hover {
+  background: var(--rw-surface-2);
+  color: var(--rw-ink);
+}
+
+/* ============================================================================
+   The board switcher, inside `PageHeader`'s own `<h1>`.
+
+   ⚠️ It inherits its type rather than declaring any, which is the whole point:
+   the board's name has to BE the page title, not a control standing where the
+   title was. The only thing this adds is a chevron and a hit area.
+   ========================================================================== */
+.rw-board-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: -6px;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--rw-radius-sm);
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.rw-board-switcher:hover {
+  background: var(--rw-surface-1);
+}
+.rw-board-switcher:focus-visible {
+  outline: none;
+  box-shadow: var(--rw-ring);
+}
+/* The chevron is the affordance, so it is quieter than the name but never
+   absent — and it sits on the text baseline rather than the box's centre. */
+.rw-board-switcher svg {
+  color: var(--rw-ink-3);
+}
+
+/* ============================================================================
+   The section name in the app header.
+
+   ⭐ Every screen names itself in the top bar now, beside the rail toggle —
+   Val's ask, 18 Sept. It is the SECTION, not the object: "Dashboards", with
+   the board's own name in the band below. So the top bar answers "where am I"
+   and the band answers "which one", and neither repeats the other.
+   ========================================================================== */
+.rw-section-title {
+  font-family: var(--rw-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--rw-ink);
+  white-space: nowrap;
+}

@@ -106,7 +106,7 @@ export function AddReportRail({
        */
       modal={false}
       title="Add to this dashboard"
-      description="The board stays visible behind this — add as many as you like."
+      description="The dashboard stays visible behind this — add as many as you like."
       /*
        * The provenance of the picker itself, stated on the surface.
        *

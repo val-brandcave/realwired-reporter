@@ -1,9 +1,10 @@
-import { useState, type KeyboardEvent } from 'react';
+import { type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, ChatComposer, Flank, Icon, IconButton } from '@realwired/ui';
+import { Button, Flank, Icon, IconButton } from '@realwired/ui';
 
+import { CopilotComposer } from './CopilotComposer';
 import { CopilotTranscript } from './CopilotTranscript';
-import { ask, setDrawerOpen, toggleDrawer, useThread } from '../lib/thread';
+import { setDrawerOpen, toggleDrawer, useThread } from '../lib/thread';
 
 /* ============================================================================
    The copilot, docked BESIDE the thing you are changing — and taking room from
@@ -112,13 +113,7 @@ export function CopilotToggle() {
 
 export function CopilotDrawer() {
   const navigate = useNavigate();
-  const { drawerOpen, pending } = useThread();
-  const [draft, setDraft] = useState('');
-
-  const send = () => {
-    ask(draft);
-    setDraft('');
-  };
+  const { drawerOpen } = useThread();
 
   /*
    * Escape closes it, but only from INSIDE.
@@ -213,27 +208,15 @@ export function CopilotDrawer() {
         footer={
           /* The composer is the footer rather than the last thing in the scroll
              area, so the way to ask never scrolls away from the reader. Same
-             decision as the chat page, arrived at the same way. */
-          <ChatComposer
-            value={draft}
-            onChange={setDraft}
-            onSubmit={send}
-            busy={Boolean(pending)}
-            /*
-             * ⭐ Dictation, and it earns its place here more than anywhere else
-             * in the app. This product's primary reader is not a query author —
-             * saying "build me a dashboard for Northgate's quarterly review" is
-             * a sentence people produce naturally, and typing it is the step
-             * that makes a copilot feel like a search box.
-             *
-             * ⚠️ The first press raises the browser's own microphone permission
-             * prompt, which is a modal we do not control. Grant it on the demo
-             * machine before a call rather than discovering it in front of one.
-             * Chrome and Edge only; the control is absent elsewhere.
-             */
-            dictation
-            placeholder="Ask, or say “build me a dashboard for…”"
-          />
+             decision as the chat page, arrived at the same way.
+
+             ⚠️ NOT `raised` here, and that is the one difference between the
+             two surfaces. The chat page's composer floats because it is the
+             point of that screen; in a 480px panel a shadow and a wider radius
+             inside a bordered footer inside a bordered panel is three nested
+             edges in 40px of height. The band is correct when the panel around
+             it is already the frame. */
+          <CopilotComposer placeholder="Ask, or say “build me a dashboard for…”" />
         }
       >
         <div className="flex flex-col gap-7">
